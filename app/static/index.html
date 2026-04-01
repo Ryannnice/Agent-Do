@@ -40,6 +40,27 @@
         radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 28%),
         radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.14), transparent 32%),
         linear-gradient(180deg, #090b10 0%, #0d1118 100%);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(74, 86, 107, 0.42) transparent;
+    }
+
+    *::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background: rgba(74, 86, 107, 0.55);
+      border-radius: 999px;
+      border: 1px solid rgba(8, 11, 16, 0.65);
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background: rgba(92, 108, 133, 0.72);
     }
 
     button,
@@ -97,7 +118,7 @@
     button {
       cursor: pointer;
       border: none;
-      padding: 12px 16px;
+      padding: 10px 14px;
       color: #06131a;
       background: linear-gradient(135deg, var(--accent), var(--accent-strong));
       transition: transform 0.12s ease, filter 0.12s ease;
@@ -128,10 +149,10 @@
 
     .app-shell {
       height: 100vh;
-      padding: 16px;
+      padding: 10px;
       display: grid;
       grid-template-columns: 300px minmax(0, 1fr);
-      gap: 16px;
+      gap: 10px;
     }
 
     .panel {
@@ -146,8 +167,8 @@
     .sidebar {
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr);
-      gap: 16px;
-      padding: 18px;
+      gap: 10px;
+      padding: 12px;
     }
 
     .brand h1 {
@@ -163,8 +184,8 @@
     }
 
     .sidebar-card {
-      padding: 14px;
-      border-radius: 18px;
+      padding: 10px;
+      border-radius: 16px;
       background: var(--panel-alt);
       border: 1px solid rgba(118, 139, 168, 0.14);
     }
@@ -185,20 +206,35 @@
     .session-actions {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .session-actions button {
+      padding: 8px 10px;
+      min-height: 34px;
+      font-size: 13px;
+      border-radius: 12px;
     }
 
     .session-list {
       min-height: 0;
       overflow: auto;
       padding-right: 4px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .session-list::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
     }
 
     .session-item {
-      padding: 14px;
-      margin-bottom: 10px;
-      border-radius: 18px;
+      padding: 11px 12px;
+      margin-bottom: 8px;
+      border-radius: 16px;
       border: 1px solid transparent;
       background: rgba(18, 24, 35, 0.95);
       cursor: pointer;
@@ -230,16 +266,16 @@
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
       min-height: 0;
-      padding: 18px;
-      gap: 16px;
+      padding: 12px;
+      gap: 10px;
     }
 
     .topbar {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 16px;
+      gap: 10px;
       align-items: end;
-      padding-bottom: 14px;
+      padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
     }
 
@@ -260,33 +296,33 @@
     .topbar-controls {
       display: grid;
       grid-template-columns: repeat(2, minmax(160px, 200px));
-      gap: 12px;
+      gap: 10px;
     }
 
     .content-grid {
       min-height: 0;
       display: grid;
       grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.08fr);
-      gap: 16px;
+      gap: 10px;
     }
 
     .pane {
       min-height: 0;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr);
-      border-radius: 20px;
+      border-radius: 18px;
       border: 1px solid var(--border);
       background: var(--panel-alt);
       overflow: hidden;
     }
 
     .pane-head {
-      padding: 14px 16px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 8px;
     }
 
     .pane-head h3 {
@@ -305,21 +341,32 @@
     .messages {
       min-height: 0;
       overflow: auto;
-      padding: 16px;
+      padding: 6px 8px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 2px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
     }
 
     .message {
-      width: min(100%, 760px);
-      padding: 16px;
-      border-radius: 18px;
-      line-height: 1.6;
+      display: inline-block;
+      width: auto;
+      max-width: min(82%, 760px);
+      padding: 1px 6px;
+      border-radius: 7px;
+      line-height: 1.08;
+      font-size: 12px;
       white-space: pre-wrap;
       word-break: break-word;
-      border: 1px solid rgba(118, 139, 168, 0.16);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      border: none;
+      box-shadow: none;
     }
 
     .message.user {
@@ -333,12 +380,11 @@
     }
 
     .message .meta {
-      display: block;
-      margin-bottom: 8px;
-      color: var(--muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      display: none;
+    }
+
+    .message-text {
+      display: inline;
     }
 
     .preview-pane {
@@ -347,32 +393,46 @@
 
     .preview-actions {
       display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+      gap: 6px;
+      flex-wrap: nowrap;
       justify-content: flex-end;
+      align-items: center;
     }
 
     .preview-actions button {
       width: auto;
-      min-width: 112px;
+      min-width: 88px;
+      padding: 8px 10px;
+      min-height: 34px;
+      font-size: 13px;
+      border-radius: 12px;
     }
 
     .preview-frame-wrap {
       position: relative;
       min-height: 0;
+      height: 100%;
+      min-height: 360px;
       background: #05070b;
+      overflow: hidden;
     }
 
     .preview-frame {
+      display: none;
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       border: 0;
       background: white;
+      transform-origin: top left;
     }
 
     .preview-empty {
       display: grid;
       place-items: center;
+      position: absolute;
+      inset: 0;
       height: 100%;
       padding: 28px;
       color: var(--muted);
@@ -381,18 +441,18 @@
     }
 
     .composer {
-      padding-top: 14px;
+      padding-top: 10px;
       border-top: 1px solid var(--border);
       display: grid;
       grid-template-rows: auto auto;
-      gap: 10px;
+      gap: 8px;
     }
 
     .composer-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
     }
 
     .composer-head strong {
@@ -410,14 +470,14 @@
     .composer-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 132px;
-      gap: 12px;
+      gap: 8px;
       align-items: stretch;
     }
 
     .composer-row button {
       height: 100%;
-      min-height: 112px;
-      font-size: 16px;
+      min-height: 104px;
+      font-size: 15px;
       font-weight: 600;
     }
 
@@ -500,6 +560,7 @@
         <div class="session-actions">
           <button id="createSessionBtn">创建 Session</button>
           <button id="refreshSessionsBtn" class="secondary">刷新列表</button>
+          <button id="deleteSessionBtn" class="warn" disabled>删除当前 Session</button>
         </div>
       </section>
 
@@ -546,7 +607,7 @@
           </div>
           <div class="preview-frame-wrap">
             <div class="preview-empty" id="previewEmpty">当前 session 还没有可预览内容。</div>
-            <iframe class="preview-frame" id="previewFrame" hidden></iframe>
+            <iframe class="preview-frame" id="previewFrame"></iframe>
           </div>
         </section>
       </div>
@@ -579,8 +640,10 @@
     const sessionTitleEl = document.getElementById("sessionTitle");
     const createSessionBtn = document.getElementById("createSessionBtn");
     const refreshSessionsBtn = document.getElementById("refreshSessionsBtn");
+    const deleteSessionBtn = document.getElementById("deleteSessionBtn");
     const sendBtn = document.getElementById("sendBtn");
     const previewMetaEl = document.getElementById("previewMeta");
+    const previewFrameWrapEl = document.querySelector(".preview-frame-wrap");
     const previewFrameEl = document.getElementById("previewFrame");
     const previewEmptyEl = document.getElementById("previewEmpty");
     const previewStartBtn = document.getElementById("previewStartBtn");
@@ -594,6 +657,7 @@
     let currentSessionId = null;
     let streaming = false;
     let currentRuntime = null;
+    let previewScaleTimers = [];
     let runtimeProfiles = {
       default_runtime_profile: "aliyun",
       items: [
@@ -610,6 +674,94 @@
       previewMetaEl.textContent = text;
     }
 
+    function setCurrentSessionState(sessionId) {
+      currentSessionId = sessionId;
+      deleteSessionBtn.disabled = !sessionId || streaming;
+    }
+
+    function clearPreviewScaleTimers() {
+      for (const timer of previewScaleTimers) {
+        clearTimeout(timer);
+      }
+      previewScaleTimers = [];
+    }
+
+    function resetPreviewFrameScale() {
+      previewFrameEl.style.position = "absolute";
+      previewFrameEl.style.inset = "0";
+      previewFrameEl.style.left = "0";
+      previewFrameEl.style.top = "0";
+      previewFrameEl.style.width = "100%";
+      previewFrameEl.style.height = "100%";
+      previewFrameEl.style.transform = "none";
+      previewFrameEl.style.transformOrigin = "top left";
+    }
+
+    function syncPreviewScale() {
+      if (!previewFrameEl.dataset.currentSrc || previewFrameEl.hidden) {
+        return;
+      }
+
+      const wrapWidth = previewFrameWrapEl.clientWidth;
+      const wrapHeight = previewFrameWrapEl.clientHeight;
+      if (!wrapWidth || !wrapHeight) {
+        return;
+      }
+
+      try {
+        const doc = previewFrameEl.contentDocument;
+        const root = doc?.documentElement;
+        const body = doc?.body;
+        if (!root || !body) {
+          resetPreviewFrameScale();
+          return;
+        }
+
+        const contentWidth = Math.max(
+          root.scrollWidth,
+          body.scrollWidth,
+          root.offsetWidth,
+          body.offsetWidth,
+          root.clientWidth,
+          body.clientWidth
+        );
+        const contentHeight = Math.max(
+          root.scrollHeight,
+          body.scrollHeight,
+          root.offsetHeight,
+          body.offsetHeight,
+          root.clientHeight,
+          body.clientHeight
+        );
+
+        if (contentWidth <= wrapWidth + 2 && contentHeight <= wrapHeight + 2) {
+          resetPreviewFrameScale();
+          return;
+        }
+
+        const scale = Math.min(wrapWidth / contentWidth, wrapHeight / contentHeight);
+        const scaledWidth = contentWidth * scale;
+        const scaledHeight = contentHeight * scale;
+
+        previewFrameEl.style.position = "absolute";
+        previewFrameEl.style.inset = "auto";
+        previewFrameEl.style.left = `${Math.max((wrapWidth - scaledWidth) / 2, 0)}px`;
+        previewFrameEl.style.top = `${Math.max((wrapHeight - scaledHeight) / 2, 0)}px`;
+        previewFrameEl.style.width = `${contentWidth}px`;
+        previewFrameEl.style.height = `${contentHeight}px`;
+        previewFrameEl.style.transform = `scale(${scale})`;
+      } catch {
+        resetPreviewFrameScale();
+      }
+    }
+
+    function schedulePreviewScaleSync() {
+      clearPreviewScaleTimers();
+      for (const delay of [0, 100, 300, 800, 1600]) {
+        previewScaleTimers.push(window.setTimeout(syncPreviewScale, delay));
+      }
+    }
+
     function escapeHtml(value) {
       return String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -623,7 +775,7 @@
         return `
           <article class="message ${item.role}">
             <span class="meta">${meta}</span>
-            <div>${escapeHtml(item.content)}</div>
+            <span class="message-text">${escapeHtml(item.content)}</span>
           </article>
         `;
       });
@@ -632,7 +784,7 @@
         blocks.push(`
           <article class="message assistant">
             <span class="meta">Claude</span>
-            <div>${escapeHtml(transientAssistantText)}</div>
+            <span class="message-text">${escapeHtml(transientAssistantText)}</span>
           </article>
         `);
       }
@@ -640,6 +792,15 @@
       messagesEl.innerHTML = blocks.join("");
       messageSummaryEl.textContent = `${items.length}${transientAssistantText ? "+" : ""} 条消息`;
       messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function resetWorkspaceView() {
+      setCurrentSessionState(null);
+      chatTitleEl.textContent = "未选择 Session";
+      chatSubtitleEl.textContent = "先选择左侧一个 session，或者创建新的 session。";
+      messageSummaryEl.textContent = "消息会显示在这里。";
+      messagesEl.innerHTML = "";
+      clearPreview("先创建一个 session，再生成页面或项目。");
     }
 
     async function fetchJson(url, options) {
@@ -715,10 +876,13 @@
 
     function clearPreview(message) {
       currentRuntime = null;
+      clearPreviewScaleTimers();
       previewFrameEl.hidden = true;
+      previewFrameEl.style.display = "none";
       previewFrameEl.removeAttribute("src");
       previewFrameEl.dataset.currentSrc = "";
-      previewEmptyEl.hidden = false;
+      resetPreviewFrameScale();
+      previewEmptyEl.style.display = "grid";
       previewEmptyEl.textContent = message;
       previewStopBtn.disabled = true;
     }
@@ -742,11 +906,15 @@
 
       if (info.can_preview && info.preview_url) {
         const src = reload ? `${info.preview_url}${info.preview_url.includes("?") ? "&" : "?"}t=${Date.now()}` : info.preview_url;
-        previewEmptyEl.hidden = true;
+        previewEmptyEl.style.display = "none";
         previewFrameEl.hidden = false;
+        previewFrameEl.style.display = "block";
+        resetPreviewFrameScale();
         if (reload || previewFrameEl.dataset.currentSrc !== info.preview_url) {
           previewFrameEl.src = src;
           previewFrameEl.dataset.currentSrc = info.preview_url;
+        } else {
+          schedulePreviewScaleSync();
         }
         return;
       }
@@ -761,7 +929,7 @@
     }
 
     async function selectSession(sessionId) {
-      currentSessionId = sessionId;
+      setCurrentSessionState(sessionId);
       const session = await fetchJson(`/sessions/${sessionId}`);
       chatTitleEl.textContent = session.title || `Session ${session.id.slice(0, 8)}`;
       chatSubtitleEl.textContent = session.workspace_path;
@@ -813,6 +981,7 @@
         sendBtn.disabled = true;
         createSessionBtn.disabled = true;
         refreshSessionsBtn.disabled = true;
+        deleteSessionBtn.disabled = true;
         previewStartBtn.disabled = true;
 
         const items = await loadMessages(currentSessionId);
@@ -886,6 +1055,7 @@
         sendBtn.disabled = false;
         createSessionBtn.disabled = false;
         refreshSessionsBtn.disabled = false;
+        deleteSessionBtn.disabled = !currentSessionId;
         previewStartBtn.disabled = false;
       }
     }
@@ -903,6 +1073,36 @@
         setStatus("Session 列表已刷新。");
       } catch (error) {
         setStatus(`刷新失败：${error.message}`);
+      }
+    });
+
+    deleteSessionBtn.addEventListener("click", async () => {
+      if (!currentSessionId || streaming) {
+        return;
+      }
+
+      const confirmed = window.confirm("确定要删除当前 Session 吗？这会同时删除消息记录、工作区文件和运行容器。");
+      if (!confirmed) {
+        return;
+      }
+
+      const deletingId = currentSessionId;
+
+      try {
+        deleteSessionBtn.disabled = true;
+        setStatus("正在删除当前 Session...");
+        await fetchJson(`/sessions/${deletingId}`, { method: "DELETE" });
+        const items = await loadSessions();
+        const nextSession = items.find((item) => item.id !== deletingId);
+        if (nextSession) {
+          await selectSession(nextSession.id);
+        } else {
+          resetWorkspaceView();
+        }
+        setStatus("当前 Session 已删除。");
+      } catch (error) {
+        deleteSessionBtn.disabled = !currentSessionId;
+        setStatus(`删除失败：${error.message}`);
       }
     });
 
@@ -957,6 +1157,17 @@
       }
     });
 
+    previewFrameEl.addEventListener("load", () => {
+      schedulePreviewScaleSync();
+      if (previewFrameEl.dataset.currentSrc) {
+        setStatus("预览内容已加载。");
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      schedulePreviewScaleSync();
+    });
+
     runtimeProfileEl.addEventListener("change", () => {
       renderModelOptions(true);
     });
@@ -972,7 +1183,7 @@
         if (items.length) {
           await selectSession(items[0].id);
         } else {
-          clearPreview("先创建一个 session，再生成页面或项目。");
+          resetWorkspaceView();
         }
       })
       .catch((error) => {

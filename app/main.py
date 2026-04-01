@@ -2,6 +2,7 @@ import http.client
 import json
 import os
 import shlex
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -261,6 +262,24 @@ def insert_message(
             (utc_now(), session_id),
         )
         conn.commit()
+
+
+def delete_session_data(session_id: str) -> dict:
+    session = fetch_session(session_id)
+    runtime_record = fetch_runtime_record(session_id)
+    container_name = runtime_record["container_name"] if runtime_record and runtime_record.get("container_name") else runtime_container_name(session_id)
+    remove_runtime_container(container_name)
+
+    session_root = Path(session["workspace_path"]).resolve().parent
+
+    with get_conn() as conn:
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM runtimes WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.commit()
+
+    shutil.rmtree(session_root, ignore_errors=True)
+    return session
 
 
 def snapshot_workspace(workspace_path: Path) -> dict[str, str]:
@@ -791,6 +810,7 @@ def proxy_runtime_response(host_port: int, preview_path: str, request: Request) 
                 "location",
             }:
                 headers[key] = value
+        headers.setdefault("Cache-Control", "no-store, max-age=0")
         return Response(content=body, status_code=response.status, headers=headers)
     except OSError as exc:
         raise HTTPException(status_code=502, detail=f"Preview proxy failed: {exc}") from exc
@@ -1097,7 +1117,10 @@ class RuntimeActionRequest(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_ROOT / "index.html")
+    return FileResponse(
+        STATIC_ROOT / "index.html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/healthz")
@@ -1151,6 +1174,12 @@ def list_sessions() -> dict:
 @app.get("/sessions/{session_id}")
 def get_session(session_id: str) -> dict:
     return fetch_session(session_id)
+
+
+@app.delete("/sessions/{session_id}")
+def delete_session(session_id: str) -> dict:
+    session = delete_session_data(session_id)
+    return {"ok": True, "deleted_session_id": session_id, "title": session.get("title")}
 
 
 @app.get("/sessions/{session_id}/messages")
@@ -1227,7 +1256,12 @@ def preview_session(session_id: str, request: Request, preview_path: str = ""):
         target = safe_workspace_file(workspace_path, preview_path)
         if not target.exists() or not target.is_file():
             raise HTTPException(status_code=404, detail="Preview file not found")
-        return FileResponse(target)
+        media_type = "text/html; charset=utf-8" if target.suffix.lower() == ".html" else None
+        return FileResponse(
+            target,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store, max-age=0"},
+        )
 
     raise HTTPException(status_code=404, detail="当前 session 没有可预览内容。")
 
