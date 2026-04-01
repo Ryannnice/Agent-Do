@@ -10,6 +10,10 @@
 - `GET /sessions/{session_id}/messages` 查看消息历史
 - `POST /sessions/{session_id}/messages` 在固定 workspace 内调用一次 Claude Code
 - `POST /sessions/{session_id}/messages/stream` 以 SSE 流式返回 Claude 输出
+- `GET /sessions/{session_id}/runtime` 查看当前 session 的预览状态
+- `POST /sessions/{session_id}/runtime/start` 启动在线预览
+- `POST /sessions/{session_id}/runtime/stop` 停止在线预览
+- `GET /sessions/{session_id}/preview/...` 访问预览内容
 - `GET /` 打开一个最小聊天页
 - 后端会对比运行前后的 workspace，返回实际变更文件列表
 - 支持在前端切换 Claude 运行配置：默认配置 / 阿里云 Anthropic 兼容接口
@@ -18,6 +22,11 @@
 
 - `workspace/`：用户项目和 Claude 改出来的文件
 - `home/`：Claude 本地状态目录，用来延续同一个 session 的上下文
+
+预览分两类：
+
+- 静态页面：如果 workspace 里有 `index.html`，或者只有一个 `.html` 文件，前端会直接预览
+- Node 项目：如果 workspace 里有 `package.json` 且含 `dev` 或 `start` 脚本，后端会起一个长期 Docker 容器来跑项目
 
 ## 目录布局
 
@@ -135,6 +144,8 @@ curl -N -X POST http://127.0.0.1:8000/sessions/<session-id>/messages/stream \
 - 为了让非交互模式先跑通，容器内命令启用了 `--dangerously-skip-permissions`
 - 为避免 Claude Code 的 root 限制，runner 会默认以当前宿主机用户的 UID/GID 运行容器
 - 阿里云模式走的是百炼官方 Anthropic 兼容接口，不是 OpenAI compatible-mode `/v1`
+- 在线预览目前只自动支持两类：静态 HTML 项目、以及带 `package.json` 的 Node 项目
+- Node 项目的运行容器会长期保活，直到你手动停止预览
 
 最后这一点只适合内部 MVP。下一步如果要上线，优先补：
 

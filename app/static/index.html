@@ -3,61 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent-Do MVP</title>
+  <title>Agent-Do</title>
   <style>
     :root {
-      --bg: #f3efe6;
-      --panel: rgba(255, 252, 246, 0.82);
-      --panel-strong: #fffaf2;
-      --border: rgba(70, 50, 20, 0.12);
-      --text: #1b1a17;
-      --muted: #6d675c;
-      --accent: #1f6f5f;
-      --accent-strong: #154d42;
-      --user: #dff4ec;
-      --assistant: #f8f1e3;
-      --shadow: 0 20px 60px rgba(43, 31, 12, 0.08);
+      --bg: #090b10;
+      --bg-accent: #111724;
+      --panel: rgba(15, 19, 28, 0.92);
+      --panel-alt: rgba(19, 24, 35, 0.92);
+      --panel-soft: rgba(27, 34, 47, 0.9);
+      --border: rgba(118, 139, 168, 0.2);
+      --border-strong: rgba(125, 211, 252, 0.32);
+      --text: #f3f6fb;
+      --muted: #92a0b7;
+      --accent: #5eead4;
+      --accent-strong: #2dd4bf;
+      --danger: #f97316;
+      --danger-strong: #ea580c;
+      --button-dark: #232b39;
+      --user: linear-gradient(135deg, rgba(45, 212, 191, 0.18), rgba(45, 212, 191, 0.08));
+      --assistant: linear-gradient(135deg, rgba(96, 165, 250, 0.16), rgba(96, 165, 250, 0.06));
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html,
     body {
       margin: 0;
-      min-height: 100vh;
+      height: 100%;
+      overflow: hidden;
       font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(31, 111, 95, 0.18), transparent 30%),
-        radial-gradient(circle at bottom right, rgba(173, 121, 66, 0.18), transparent 32%),
-        linear-gradient(180deg, #f8f3ea 0%, #efe7da 100%);
+        radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.14), transparent 32%),
+        linear-gradient(180deg, #090b10 0%, #0d1118 100%);
     }
 
-    .shell {
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      outline: none;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      background: rgba(17, 22, 32, 0.98);
+      color: var(--text);
+      padding: 12px 14px;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--border-strong);
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12);
+    }
+
+    select {
+      appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:
+        calc(100% - 22px) calc(50% - 2px),
+        calc(100% - 16px) calc(50% - 2px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 36px;
+    }
+
+    textarea {
+      resize: none;
+      min-height: 112px;
+      line-height: 1.55;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      padding: 12px 16px;
+      color: #06131a;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      filter: none;
+    }
+
+    button.secondary {
+      color: var(--text);
+      background: var(--button-dark);
+      border: 1px solid var(--border);
+    }
+
+    button.warn {
+      color: #fff5eb;
+      background: linear-gradient(135deg, var(--danger), var(--danger-strong));
+    }
+
+    .app-shell {
+      height: 100vh;
+      padding: 16px;
       display: grid;
-      grid-template-columns: 320px 1fr;
-      gap: 20px;
-      min-height: 100vh;
-      padding: 24px;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 16px;
     }
 
     .panel {
-      background: var(--panel);
-      backdrop-filter: blur(14px);
-      border: 1px solid var(--border);
+      min-height: 0;
       border-radius: 24px;
+      border: 1px solid var(--border);
+      background: var(--panel);
       box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
     }
 
     .sidebar {
-      display: flex;
-      flex-direction: column;
-      padding: 20px;
-    }
-
-    .brand {
-      margin-bottom: 18px;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 16px;
+      padding: 18px;
     }
 
     .brand h1 {
@@ -69,79 +159,60 @@
     .brand p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
-    .form-group {
-      margin: 14px 0;
+    .sidebar-card {
+      padding: 14px;
+      border-radius: 18px;
+      background: var(--panel-alt);
+      border: 1px solid rgba(118, 139, 168, 0.14);
     }
 
-    .form-group label {
+    .field + .field {
+      margin-top: 12px;
+    }
+
+    .field label {
       display: block;
       margin-bottom: 6px;
-      font-size: 13px;
       color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
-    input,
-    textarea,
-    button {
-      width: 100%;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      font: inherit;
-    }
-
-    input,
-    textarea {
-      padding: 12px 14px;
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.84);
-    }
-
-    textarea {
-      min-height: 120px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    button {
-      padding: 12px 14px;
-      cursor: pointer;
-      background: var(--accent);
-      color: white;
-      border: none;
-      transition: transform 0.12s ease, background 0.12s ease;
-    }
-
-    button:hover {
-      background: var(--accent-strong);
-      transform: translateY(-1px);
-    }
-
-    button.secondary {
-      background: #ede6d8;
-      color: var(--text);
+    .session-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
     }
 
     .session-list {
-      margin-top: 18px;
+      min-height: 0;
       overflow: auto;
       padding-right: 4px;
     }
 
     .session-item {
-      padding: 12px 14px;
+      padding: 14px;
       margin-bottom: 10px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.64);
+      border-radius: 18px;
       border: 1px solid transparent;
+      background: rgba(18, 24, 35, 0.95);
       cursor: pointer;
+      transition: border-color 0.12s ease, transform 0.12s ease, background 0.12s ease;
+    }
+
+    .session-item:hover {
+      transform: translateY(-1px);
+      border-color: rgba(125, 211, 252, 0.16);
     }
 
     .session-item.active {
-      border-color: rgba(31, 111, 95, 0.28);
-      background: rgba(223, 244, 236, 0.76);
+      border-color: rgba(125, 211, 252, 0.36);
+      background: linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(96, 165, 250, 0.08));
     }
 
     .session-item strong {
@@ -152,54 +223,112 @@
     .session-item span {
       color: var(--muted);
       font-size: 12px;
+      line-height: 1.45;
     }
 
-    .chat {
+    .workspace {
       display: grid;
-      grid-template-rows: auto 1fr auto;
-      min-height: calc(100vh - 48px);
-      padding: 20px;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: 0;
+      padding: 18px;
+      gap: 16px;
     }
 
-    .chat-header {
-      padding: 6px 4px 16px;
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: end;
+      padding-bottom: 14px;
       border-bottom: 1px solid var(--border);
     }
 
-    .chat-header h2 {
+    .session-meta h2 {
       margin: 0 0 4px;
-      font-size: 24px;
-      letter-spacing: -0.03em;
+      font-size: 26px;
+      letter-spacing: -0.04em;
     }
 
-    .chat-header p,
-    .status {
+    .session-meta p {
       margin: 0;
       color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+
+    .topbar-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(160px, 200px));
+      gap: 12px;
+    }
+
+    .content-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.08fr);
+      gap: 16px;
+    }
+
+    .pane {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--panel-alt);
+      overflow: hidden;
+    }
+
+    .pane-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .pane-head h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .pane-head small,
+    .preview-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
     }
 
     .messages {
+      min-height: 0;
       overflow: auto;
-      padding: 20px 4px 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     .message {
-      max-width: 860px;
-      margin-bottom: 16px;
-      padding: 16px 18px;
+      width: min(100%, 760px);
+      padding: 16px;
       border-radius: 18px;
       line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(118, 139, 168, 0.16);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
     }
 
     .message.user {
+      align-self: flex-end;
       background: var(--user);
-      margin-left: auto;
     }
 
     .message.assistant {
+      align-self: flex-start;
       background: var(--assistant);
     }
 
@@ -207,96 +336,231 @@
       display: block;
       margin-bottom: 8px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
 
-    .composer {
-      border-top: 1px solid var(--border);
-      padding-top: 16px;
+    .preview-pane {
+      background: var(--panel-soft);
     }
 
-    .composer-grid {
+    .preview-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .preview-actions button {
+      width: auto;
+      min-width: 112px;
+    }
+
+    .preview-frame-wrap {
+      position: relative;
+      min-height: 0;
+      background: #05070b;
+    }
+
+    .preview-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: white;
+    }
+
+    .preview-empty {
       display: grid;
-      grid-template-columns: 1fr 140px 160px 120px;
+      place-items: center;
+      height: 100%;
+      padding: 28px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .composer {
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: 10px;
+    }
+
+    .composer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       gap: 12px;
-      align-items: end;
+    }
+
+    .composer-head strong {
+      font-size: 14px;
+      letter-spacing: -0.01em;
     }
 
     .status {
-      margin-top: 10px;
-      min-height: 20px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    .composer-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 132px;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .composer-row button {
+      height: 100%;
+      min-height: 112px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .composer-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 1240px) {
+      .app-shell {
+        grid-template-columns: 280px minmax(0, 1fr);
+      }
+
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 920px) {
-      .shell {
+      html,
+      body {
+        overflow: auto;
+      }
+
+      .app-shell {
+        height: auto;
+        min-height: 100vh;
         grid-template-columns: 1fr;
       }
 
-      .chat {
+      .workspace {
+        grid-template-rows: auto auto auto;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar-controls {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .content-grid {
         min-height: auto;
       }
 
-      .composer-grid {
+      .messages,
+      .preview-frame-wrap {
+        min-height: 280px;
+      }
+
+      .composer-row {
         grid-template-columns: 1fr;
+      }
+
+      .composer-row button {
+        min-height: 56px;
       }
     }
   </style>
 </head>
 <body>
-  <main class="shell">
+  <main class="app-shell">
     <aside class="panel sidebar">
-      <div class="brand">
+      <section class="brand">
         <h1>Agent-Do</h1>
-        <p>极简 Claude Code MVP。每个 session 绑定一个固定 workspace。</p>
-      </div>
+        <p>Claude Code 多会话工作台。左侧管理 session，右侧同时查看对话、预览和发送面板。</p>
+      </section>
 
-      <div class="form-group">
-        <label for="userId">User ID</label>
-        <input id="userId" value="demo-user" />
-      </div>
+      <section class="sidebar-card">
+        <div class="field">
+          <label for="userId">User ID</label>
+          <input id="userId" value="demo-user" />
+        </div>
+        <div class="field">
+          <label for="sessionTitle">Session Title</label>
+          <input id="sessionTitle" placeholder="例如：推箱子原型" />
+        </div>
+        <div class="session-actions">
+          <button id="createSessionBtn">创建 Session</button>
+          <button id="refreshSessionsBtn" class="secondary">刷新列表</button>
+        </div>
+      </section>
 
-      <div class="form-group">
-        <label for="sessionTitle">Session Title</label>
-        <input id="sessionTitle" placeholder="例如：修 README" />
-      </div>
-
-      <button id="createSessionBtn">创建 Session</button>
-      <button id="refreshSessionsBtn" class="secondary" style="margin-top: 10px;">刷新列表</button>
-
-      <div class="session-list" id="sessionList"></div>
+      <section class="session-list" id="sessionList"></section>
     </aside>
 
-    <section class="panel chat">
-      <header class="chat-header">
-        <h2 id="chatTitle">未选择 Session</h2>
-        <p id="chatSubtitle">先创建一个 session，再开始对话。</p>
+    <section class="panel workspace">
+      <header class="topbar">
+        <div class="session-meta">
+          <h2 id="chatTitle">未选择 Session</h2>
+          <p id="chatSubtitle">先选择左侧一个 session，或者创建新的 session。</p>
+        </div>
+        <div class="topbar-controls">
+          <div class="field" style="margin: 0;">
+            <label for="runtimeProfile">Runtime</label>
+            <select id="runtimeProfile"></select>
+          </div>
+          <div class="field" style="margin: 0;">
+            <label for="model">Model</label>
+            <select id="model"></select>
+          </div>
+        </div>
       </header>
 
-      <div class="messages" id="messages"></div>
+      <div class="content-grid">
+        <section class="pane">
+          <div class="pane-head">
+            <h3>对话</h3>
+            <small id="messageSummary">消息会显示在这里。</small>
+          </div>
+          <div class="messages" id="messages"></div>
+        </section>
+
+        <section class="pane preview-pane">
+          <div class="pane-head">
+            <div>
+              <h3>在线预览</h3>
+              <div class="preview-meta" id="previewMeta">选择一个 session 后即可查看可预览内容。</div>
+            </div>
+            <div class="preview-actions">
+              <button id="previewStartBtn">启动/刷新</button>
+              <button id="previewStopBtn" class="warn">停止运行</button>
+            </div>
+          </div>
+          <div class="preview-frame-wrap">
+            <div class="preview-empty" id="previewEmpty">当前 session 还没有可预览内容。</div>
+            <iframe class="preview-frame" id="previewFrame" hidden></iframe>
+          </div>
+        </section>
+      </div>
 
       <footer class="composer">
-        <div class="composer-grid">
-          <div class="form-group" style="margin: 0;">
-            <label for="prompt">Prompt</label>
-            <textarea id="prompt" placeholder="例如：请分析当前目录并创建一个 README.md"></textarea>
-          </div>
-          <div class="form-group" style="margin: 0;">
-            <label for="runtimeProfile">Runtime</label>
-            <input id="runtimeProfile" value="aliyun" list="runtimeOptions" />
-            <datalist id="runtimeOptions">
-              <option value="aliyun"></option>
-              <option value="default"></option>
-            </datalist>
-          </div>
-          <div class="form-group" style="margin: 0;">
-            <label for="model">Model</label>
-            <input id="model" value="sonnet" />
-          </div>
+        <div class="composer-head">
+          <strong>Prompt</strong>
+          <div class="status" id="status">准备就绪。</div>
+        </div>
+        <div class="composer-row">
+          <textarea id="prompt" placeholder="例如：请在当前目录写一个带碰撞检测和计分的打砖块小游戏，并确保可以直接预览。"></textarea>
           <button id="sendBtn">发送</button>
         </div>
-        <p class="status" id="status"></p>
+        <p class="composer-hint">快捷键：Ctrl/Command + Enter 发送。对话区和预览区会独立滚动，不再挤占发送栏。</p>
       </footer>
     </section>
   </main>
@@ -307,6 +571,7 @@
     const statusEl = document.getElementById("status");
     const chatTitleEl = document.getElementById("chatTitle");
     const chatSubtitleEl = document.getElementById("chatSubtitle");
+    const messageSummaryEl = document.getElementById("messageSummary");
     const promptEl = document.getElementById("prompt");
     const modelEl = document.getElementById("model");
     const runtimeProfileEl = document.getElementById("runtimeProfile");
@@ -315,19 +580,34 @@
     const createSessionBtn = document.getElementById("createSessionBtn");
     const refreshSessionsBtn = document.getElementById("refreshSessionsBtn");
     const sendBtn = document.getElementById("sendBtn");
+    const previewMetaEl = document.getElementById("previewMeta");
+    const previewFrameEl = document.getElementById("previewFrame");
+    const previewEmptyEl = document.getElementById("previewEmpty");
+    const previewStartBtn = document.getElementById("previewStartBtn");
+    const previewStopBtn = document.getElementById("previewStopBtn");
+
+    const modelOptionsByProfile = {
+      default: ["sonnet"],
+      aliyun: ["qwen3-coder-next"]
+    };
 
     let currentSessionId = null;
     let streaming = false;
+    let currentRuntime = null;
     let runtimeProfiles = {
       default_runtime_profile: "aliyun",
       items: [
-        { id: "default", default_model: "sonnet", configured: true },
-        { id: "aliyun", default_model: "qwen3-coder-next", configured: true }
+        { id: "default", label: "Claude Default", default_model: "sonnet", configured: true },
+        { id: "aliyun", label: "Claude via Aliyun", default_model: "qwen3-coder-next", configured: true }
       ]
     };
 
     function setStatus(text) {
       statusEl.textContent = text;
+    }
+
+    function setPreviewMeta(text) {
+      previewMetaEl.textContent = text;
     }
 
     function escapeHtml(value) {
@@ -358,6 +638,7 @@
       }
 
       messagesEl.innerHTML = blocks.join("");
+      messageSummaryEl.textContent = `${items.length}${transientAssistantText ? "+" : ""} 条消息`;
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
@@ -376,44 +657,107 @@
       return response.json();
     }
 
-    async function loadSessions() {
-      const data = await fetchJson("/sessions");
-      const items = data.items || [];
-      sessionListEl.innerHTML = items.map((item) => `
-        <div class="session-item ${item.id === currentSessionId ? "active" : ""}" data-id="${item.id}">
-          <strong>${escapeHtml(item.title || item.id.slice(0, 8))}</strong>
-          <span>${escapeHtml(item.user_id)} · ${escapeHtml(item.last_active_at)}</span>
-        </div>
-      `).join("");
+    function renderRuntimeOptions() {
+      const current = runtimeProfileEl.value || runtimeProfiles.default_runtime_profile;
+      runtimeProfileEl.innerHTML = runtimeProfiles.items.map((item) => {
+        const suffix = item.configured ? "" : "（未配置）";
+        const disabled = item.configured ? "" : "disabled";
+        return `<option value="${item.id}" ${disabled}>${escapeHtml(item.label || item.id)}${suffix}</option>`;
+      }).join("");
 
-      document.querySelectorAll(".session-item").forEach((el) => {
-        el.addEventListener("click", () => selectSession(el.dataset.id));
-      });
+      const canUseCurrent = runtimeProfiles.items.some((item) => item.id === current && item.configured);
+      runtimeProfileEl.value = canUseCurrent ? current : (runtimeProfiles.items.find((item) => item.configured)?.id || runtimeProfiles.default_runtime_profile);
     }
 
-    function getRuntimeProfileConfig(profileId) {
-      return runtimeProfiles.items.find((item) => item.id === profileId);
-    }
+    function renderModelOptions(force = false) {
+      const profileId = runtimeProfileEl.value || runtimeProfiles.default_runtime_profile || "aliyun";
+      const fallback = runtimeProfiles.items.find((item) => item.id === profileId)?.default_model || "sonnet";
+      const options = modelOptionsByProfile[profileId] || [fallback];
+      const current = modelEl.value;
 
-    function syncModelToRuntimeProfile(force = false) {
-      const profileId = runtimeProfileEl.value.trim() || runtimeProfiles.default_runtime_profile || "aliyun";
-      const profile = getRuntimeProfileConfig(profileId);
-      if (!profile) return;
-      if (force || !modelEl.value.trim() || modelEl.value.trim() === "sonnet" || modelEl.value.trim() === "qwen3-coder-next") {
-        modelEl.value = profile.default_model;
+      modelEl.innerHTML = options.map((item) => `<option value="${item}">${item}</option>`).join("");
+      if (!force && options.includes(current)) {
+        modelEl.value = current;
+      } else {
+        modelEl.value = options[0];
       }
     }
 
     async function loadRuntimeProfiles() {
       const data = await fetchJson("/runtime-profiles");
       runtimeProfiles = data;
-      runtimeProfileEl.value = data.default_runtime_profile || "aliyun";
-      syncModelToRuntimeProfile(true);
+      renderRuntimeOptions();
+      renderModelOptions(true);
+    }
+
+    async function loadSessions() {
+      const data = await fetchJson("/sessions");
+      const items = data.items || [];
+      sessionListEl.innerHTML = items.map((item) => `
+        <article class="session-item ${item.id === currentSessionId ? "active" : ""}" data-id="${item.id}">
+          <strong>${escapeHtml(item.title || `Session ${item.id.slice(0, 8)}`)}</strong>
+          <span>${escapeHtml(item.user_id)} · ${escapeHtml(item.last_active_at)}</span>
+        </article>
+      `).join("");
+
+      document.querySelectorAll(".session-item").forEach((el) => {
+        el.addEventListener("click", () => selectSession(el.dataset.id));
+      });
+
+      return items;
     }
 
     async function loadMessages(sessionId) {
       const data = await fetchJson(`/sessions/${sessionId}/messages`);
       renderMessages(data.items || []);
+      return data.items || [];
+    }
+
+    function clearPreview(message) {
+      currentRuntime = null;
+      previewFrameEl.hidden = true;
+      previewFrameEl.removeAttribute("src");
+      previewFrameEl.dataset.currentSrc = "";
+      previewEmptyEl.hidden = false;
+      previewEmptyEl.textContent = message;
+      previewStopBtn.disabled = true;
+    }
+
+    function applyRuntimeInfo(info, { reload = false } = {}) {
+      currentRuntime = info;
+      const modeLabel = info.mode === "node" ? "Node 运行容器" : info.mode === "static" ? "静态页面" : "不可预览";
+      const statusLabel = {
+        ready: "可直接预览",
+        running: "运行中",
+        stopped: "已停止",
+        starting: "启动中",
+        failed: "启动失败",
+        not_configured: "未配置运行命令",
+        not_available: "不可预览"
+      }[info.status] || info.status;
+      const extra = info.entry_file ? `入口：${info.entry_file}` : (info.last_error || "当前还没有可预览内容。");
+      setPreviewMeta(`${modeLabel} · ${statusLabel} · ${extra}`);
+
+      previewStopBtn.disabled = !(info.mode === "node" && ["running", "starting", "failed", "stopped"].includes(info.status));
+
+      if (info.can_preview && info.preview_url) {
+        const src = reload ? `${info.preview_url}${info.preview_url.includes("?") ? "&" : "?"}t=${Date.now()}` : info.preview_url;
+        previewEmptyEl.hidden = true;
+        previewFrameEl.hidden = false;
+        if (reload || previewFrameEl.dataset.currentSrc !== info.preview_url) {
+          previewFrameEl.src = src;
+          previewFrameEl.dataset.currentSrc = info.preview_url;
+        }
+        return;
+      }
+
+      clearPreview(info.last_error || (info.mode === "node" ? "点击“启动/刷新”运行项目。" : "当前 session 还没有可预览内容。"));
+    }
+
+    async function loadRuntime(sessionId, options = {}) {
+      const info = await fetchJson(`/sessions/${sessionId}/runtime`);
+      applyRuntimeInfo(info, options);
+      return info;
     }
 
     async function selectSession(sessionId) {
@@ -423,6 +767,7 @@
       chatSubtitleEl.textContent = session.workspace_path;
       await loadSessions();
       await loadMessages(sessionId);
+      await loadRuntime(sessionId);
     }
 
     async function createSession() {
@@ -455,6 +800,7 @@
 
     async function sendMessage() {
       if (streaming) return;
+
       try {
         if (!currentSessionId) {
           await createSession();
@@ -467,9 +813,9 @@
         sendBtn.disabled = true;
         createSessionBtn.disabled = true;
         refreshSessionsBtn.disabled = true;
+        previewStartBtn.disabled = true;
 
-        const existing = await fetchJson(`/sessions/${currentSessionId}/messages`);
-        const items = existing.items || [];
+        const items = await loadMessages(currentSessionId);
         items.push({ role: "user", content });
         renderMessages(items);
         promptEl.value = "";
@@ -480,8 +826,8 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             content,
-            runtime_profile: runtimeProfileEl.value.trim() || runtimeProfiles.default_runtime_profile || "aliyun",
-            model: modelEl.value.trim() || "sonnet",
+            runtime_profile: runtimeProfileEl.value || runtimeProfiles.default_runtime_profile || "aliyun",
+            model: modelEl.value || "sonnet",
             max_turns: 8
           })
         });
@@ -518,14 +864,12 @@
 
             if (parsed.event === "done") {
               const changed = parsed.data.changed_files || [];
-              const detail = changed.length
-                ? `变更文件: ${changed.join(", ")}`
-                : "未检测到 workspace 文件变更";
+              const detail = changed.length ? `变更文件：${changed.join(", ")}` : "未检测到 workspace 文件变更";
               setStatus(`执行完成，耗时 ${parsed.data.duration_ms} ms；${detail}`);
             }
 
             if (parsed.event === "error") {
-              setStatus(`执行失败: ${parsed.data.message}`);
+              setStatus(`执行失败：${parsed.data.message}`);
             }
           }
 
@@ -534,30 +878,87 @@
 
         await loadMessages(currentSessionId);
         await loadSessions();
+        await loadRuntime(currentSessionId, { reload: true });
       } catch (error) {
-        setStatus(`请求失败: ${error.message}`);
+        setStatus(`请求失败：${error.message}`);
       } finally {
         streaming = false;
         sendBtn.disabled = false;
         createSessionBtn.disabled = false;
         refreshSessionsBtn.disabled = false;
+        previewStartBtn.disabled = false;
       }
     }
 
     createSessionBtn.addEventListener("click", () => {
-      createSession().catch((error) => setStatus(`创建失败: ${error.message}`));
+      createSession().catch((error) => setStatus(`创建失败：${error.message}`));
     });
 
-    refreshSessionsBtn.addEventListener("click", () => {
-      loadSessions().catch((error) => setStatus(`刷新失败: ${error.message}`));
+    refreshSessionsBtn.addEventListener("click", async () => {
+      try {
+        const items = await loadSessions();
+        if (!currentSessionId && items.length) {
+          await selectSession(items[0].id);
+        }
+        setStatus("Session 列表已刷新。");
+      } catch (error) {
+        setStatus(`刷新失败：${error.message}`);
+      }
     });
 
     sendBtn.addEventListener("click", () => {
       sendMessage();
     });
 
+    previewStartBtn.addEventListener("click", async () => {
+      if (!currentSessionId) {
+        setStatus("请先选择或创建一个 session。");
+        return;
+      }
+
+      try {
+        setStatus("正在准备预览...");
+        const runtime = await fetchJson(`/sessions/${currentSessionId}/runtime`);
+        if (runtime.mode === "static") {
+          applyRuntimeInfo(runtime, { reload: true });
+          setStatus("静态页面已刷新预览。");
+          return;
+        }
+
+        if (runtime.mode === "node" && runtime.status === "running") {
+          applyRuntimeInfo(runtime, { reload: true });
+          setStatus("已刷新正在运行的预览。");
+          return;
+        }
+
+        const started = await fetchJson(`/sessions/${currentSessionId}/runtime/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restart: false })
+        });
+        applyRuntimeInfo(started, { reload: true });
+        setStatus(started.status === "running" ? "项目已启动，可在右侧预览。" : `当前状态：${started.status}`);
+      } catch (error) {
+        clearPreview(`预览启动失败：${error.message}`);
+        setStatus(`预览启动失败：${error.message}`);
+      }
+    });
+
+    previewStopBtn.addEventListener("click", async () => {
+      if (!currentSessionId) return;
+      try {
+        const stopped = await fetchJson(`/sessions/${currentSessionId}/runtime/stop`, {
+          method: "POST"
+        });
+        applyRuntimeInfo(stopped);
+        setStatus("运行中的预览已停止。");
+      } catch (error) {
+        setStatus(`停止预览失败：${error.message}`);
+      }
+    });
+
     runtimeProfileEl.addEventListener("change", () => {
-      syncModelToRuntimeProfile(true);
+      renderModelOptions(true);
     });
 
     promptEl.addEventListener("keydown", (event) => {
@@ -566,9 +967,17 @@
       }
     });
 
-    Promise.all([loadRuntimeProfiles(), loadSessions()]).catch((error) => {
-      setStatus(`初始化失败: ${error.message}`);
-    });
+    Promise.all([loadRuntimeProfiles(), loadSessions()])
+      .then(async ([_, items]) => {
+        if (items.length) {
+          await selectSession(items[0].id);
+        } else {
+          clearPreview("先创建一个 session，再生成页面或项目。");
+        }
+      })
+      .catch((error) => {
+        setStatus(`初始化失败：${error.message}`);
+      });
   </script>
 </body>
 </html>
