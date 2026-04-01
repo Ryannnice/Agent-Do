@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent-Do MVP</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --panel: rgba(255, 252, 246, 0.82);
+      --panel-strong: #fffaf2;
+      --border: rgba(70, 50, 20, 0.12);
+      --text: #1b1a17;
+      --muted: #6d675c;
+      --accent: #1f6f5f;
+      --accent-strong: #154d42;
+      --user: #dff4ec;
+      --assistant: #f8f1e3;
+      --shadow: 0 20px 60px rgba(43, 31, 12, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(31, 111, 95, 0.18), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(173, 121, 66, 0.18), transparent 32%),
+        linear-gradient(180deg, #f8f3ea 0%, #efe7da 100%);
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+
+    .brand {
+      margin-bottom: 18px;
+    }
+
+    .brand h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      letter-spacing: -0.04em;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin: 14px 0;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input,
+    textarea,
+    button {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      font: inherit;
+    }
+
+    input,
+    textarea {
+      padding: 12px 14px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.84);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    button {
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      border: none;
+      transition: transform 0.12s ease, background 0.12s ease;
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: #ede6d8;
+      color: var(--text);
+    }
+
+    .session-list {
+      margin-top: 18px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .session-item {
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.64);
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+
+    .session-item.active {
+      border-color: rgba(31, 111, 95, 0.28);
+      background: rgba(223, 244, 236, 0.76);
+    }
+
+    .session-item strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .session-item span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .chat {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: calc(100vh - 48px);
+      padding: 20px;
+    }
+
+    .chat-header {
+      padding: 6px 4px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chat-header h2 {
+      margin: 0 0 4px;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .chat-header p,
+    .status {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .messages {
+      overflow: auto;
+      padding: 20px 4px 12px;
+    }
+
+    .message {
+      max-width: 860px;
+      margin-bottom: 16px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px solid var(--border);
+    }
+
+    .message.user {
+      background: var(--user);
+      margin-left: auto;
+    }
+
+    .message.assistant {
+      background: var(--assistant);
+    }
+
+    .message .meta {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .composer {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    .composer-grid {
+      display: grid;
+      grid-template-columns: 1fr 140px 120px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .status {
+      margin-top: 10px;
+      min-height: 20px;
+    }
+
+    @media (max-width: 920px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .chat {
+        min-height: auto;
+      }
+
+      .composer-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <aside class="panel sidebar">
+      <div class="brand">
+        <h1>Agent-Do</h1>
+        <p>极简 Claude Code MVP。每个 session 绑定一个固定 workspace。</p>
+      </div>
+
+      <div class="form-group">
+        <label for="userId">User ID</label>
+        <input id="userId" value="demo-user" />
+      </div>
+
+      <div class="form-group">
+        <label for="sessionTitle">Session Title</label>
+        <input id="sessionTitle" placeholder="例如：修 README" />
+      </div>
+
+      <button id="createSessionBtn">创建 Session</button>
+      <button id="refreshSessionsBtn" class="secondary" style="margin-top: 10px;">刷新列表</button>
+
+      <div class="session-list" id="sessionList"></div>
+    </aside>
+
+    <section class="panel chat">
+      <header class="chat-header">
+        <h2 id="chatTitle">未选择 Session</h2>
+        <p id="chatSubtitle">先创建一个 session，再开始对话。</p>
+      </header>
+
+      <div class="messages" id="messages"></div>
+
+      <footer class="composer">
+        <div class="composer-grid">
+          <div class="form-group" style="margin: 0;">
+            <label for="prompt">Prompt</label>
+            <textarea id="prompt" placeholder="例如：请分析当前目录并创建一个 README.md"></textarea>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="model">Model</label>
+            <input id="model" value="sonnet" />
+          </div>
+          <button id="sendBtn">发送</button>
+        </div>
+        <p class="status" id="status"></p>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const sessionListEl = document.getElementById("sessionList");
+    const messagesEl = document.getElementById("messages");
+    const statusEl = document.getElementById("status");
+    const chatTitleEl = document.getElementById("chatTitle");
+    const chatSubtitleEl = document.getElementById("chatSubtitle");
+    const promptEl = document.getElementById("prompt");
+    const modelEl = document.getElementById("model");
+    const userIdEl = document.getElementById("userId");
+    const sessionTitleEl = document.getElementById("sessionTitle");
+    const createSessionBtn = document.getElementById("createSessionBtn");
+    const refreshSessionsBtn = document.getElementById("refreshSessionsBtn");
+    const sendBtn = document.getElementById("sendBtn");
+
+    let currentSessionId = null;
+    let streaming = false;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function renderMessages(items, transientAssistantText = "") {
+      const blocks = items.map((item) => {
+        const meta = item.role === "user" ? "User" : "Claude";
+        return `
+          <article class="message ${item.role}">
+            <span class="meta">${meta}</span>
+            <div>${escapeHtml(item.content)}</div>
+          </article>
+        `;
+      });
+
+      if (transientAssistantText) {
+        blocks.push(`
+          <article class="message assistant">
+            <span class="meta">Claude</span>
+            <div>${escapeHtml(transientAssistantText)}</div>
+          </article>
+        `);
+      }
+
+      messagesEl.innerHTML = blocks.join("");
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          detail = body.detail || detail;
+        } catch {
+          detail = await response.text();
+        }
+        throw new Error(detail);
+      }
+      return response.json();
+    }
+
+    async function loadSessions() {
+      const data = await fetchJson("/sessions");
+      const items = data.items || [];
+      sessionListEl.innerHTML = items.map((item) => `
+        <div class="session-item ${item.id === currentSessionId ? "active" : ""}" data-id="${item.id}">
+          <strong>${escapeHtml(item.title || item.id.slice(0, 8))}</strong>
+          <span>${escapeHtml(item.user_id)} · ${escapeHtml(item.last_active_at)}</span>
+        </div>
+      `).join("");
+
+      document.querySelectorAll(".session-item").forEach((el) => {
+        el.addEventListener("click", () => selectSession(el.dataset.id));
+      });
+    }
+
+    async function loadMessages(sessionId) {
+      const data = await fetchJson(`/sessions/${sessionId}/messages`);
+      renderMessages(data.items || []);
+    }
+
+    async function selectSession(sessionId) {
+      currentSessionId = sessionId;
+      const session = await fetchJson(`/sessions/${sessionId}`);
+      chatTitleEl.textContent = session.title || `Session ${session.id.slice(0, 8)}`;
+      chatSubtitleEl.textContent = session.workspace_path;
+      await loadSessions();
+      await loadMessages(sessionId);
+    }
+
+    async function createSession() {
+      const user_id = userIdEl.value.trim() || "demo-user";
+      const title = sessionTitleEl.value.trim() || null;
+      const session = await fetchJson("/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id, title })
+      });
+      sessionTitleEl.value = "";
+      await loadSessions();
+      await selectSession(session.id);
+      setStatus(`已创建 session: ${session.id}`);
+    }
+
+    function parseSseBlock(block) {
+      const lines = block.split("\n");
+      let event = "message";
+      const dataLines = [];
+
+      for (const line of lines) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+      }
+
+      if (!dataLines.length) return null;
+      return { event, data: JSON.parse(dataLines.join("\n")) };
+    }
+
+    async function sendMessage() {
+      if (streaming) return;
+      try {
+        if (!currentSessionId) {
+          await createSession();
+        }
+
+        const content = promptEl.value.trim();
+        if (!content) return;
+
+        streaming = true;
+        sendBtn.disabled = true;
+        createSessionBtn.disabled = true;
+        refreshSessionsBtn.disabled = true;
+
+        const existing = await fetchJson(`/sessions/${currentSessionId}/messages`);
+        const items = existing.items || [];
+        items.push({ role: "user", content });
+        renderMessages(items);
+        promptEl.value = "";
+        setStatus("Claude 正在执行...");
+
+        const response = await fetch(`/sessions/${currentSessionId}/messages/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content,
+            model: modelEl.value.trim() || "sonnet",
+            max_turns: 8
+          })
+        });
+
+        if (!response.ok || !response.body) {
+          const text = await response.text();
+          throw new Error(text || "流式请求失败");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let assistantText = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+          let boundary = buffer.indexOf("\n\n");
+          while (boundary !== -1) {
+            const block = buffer.slice(0, boundary).trim();
+            buffer = buffer.slice(boundary + 2);
+            boundary = buffer.indexOf("\n\n");
+
+            if (!block) continue;
+            const parsed = parseSseBlock(block);
+            if (!parsed) continue;
+
+            if (parsed.event === "chunk") {
+              assistantText += parsed.data.text || "";
+              renderMessages(items, assistantText);
+              setStatus("Claude 正在输出...");
+            }
+
+            if (parsed.event === "done") {
+              setStatus(`执行完成，耗时 ${parsed.data.duration_ms} ms`);
+            }
+
+            if (parsed.event === "error") {
+              setStatus(`执行失败: ${parsed.data.message}`);
+            }
+          }
+
+          if (done) break;
+        }
+
+        await loadMessages(currentSessionId);
+        await loadSessions();
+      } catch (error) {
+        setStatus(`请求失败: ${error.message}`);
+      } finally {
+        streaming = false;
+        sendBtn.disabled = false;
+        createSessionBtn.disabled = false;
+        refreshSessionsBtn.disabled = false;
+      }
+    }
+
+    createSessionBtn.addEventListener("click", () => {
+      createSession().catch((error) => setStatus(`创建失败: ${error.message}`));
+    });
+
+    refreshSessionsBtn.addEventListener("click", () => {
+      loadSessions().catch((error) => setStatus(`刷新失败: ${error.message}`));
+    });
+
+    sendBtn.addEventListener("click", () => {
+      sendMessage();
+    });
+
+    promptEl.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        sendMessage();
+      }
+    });
+
+    loadSessions().catch((error) => setStatus(`初始化失败: ${error.message}`));
+  </script>
+</body>
+</html>
