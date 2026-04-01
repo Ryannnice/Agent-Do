@@ -11,6 +11,8 @@
 - `POST /sessions/{session_id}/messages` 在固定 workspace 内调用一次 Claude Code
 - `POST /sessions/{session_id}/messages/stream` 以 SSE 流式返回 Claude 输出
 - `GET /` 打开一个最小聊天页
+- 后端会对比运行前后的 workspace，返回实际变更文件列表
+- 支持在前端切换 Claude 运行配置：默认配置 / 阿里云 Anthropic 兼容接口
 
 每个 session 都会绑定两个本地目录：
 
@@ -62,11 +64,22 @@ export ANTHROPIC_API_KEY=...
 export CLAUDE_DOCKER_IMAGE=claude-runtime:latest
 ```
 
+如果要通过阿里云百炼运行 Claude Code，请配置：
+
+```bash
+export ALIYUN_ANTHROPIC_BASE_URL=https://dashscope.aliyuncs.com/apps/anthropic
+export ALIYUN_ANTHROPIC_API_KEY=...
+export ALIYUN_ANTHROPIC_MODEL=qwen3-coder-next
+export DEFAULT_RUNTIME_PROFILE=aliyun
+```
+
 ## 4. 启动服务
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+应用启动时会自动读取项目根目录的 `.env`。
 
 打开浏览器访问：
 
@@ -121,6 +134,7 @@ curl -N -X POST http://127.0.0.1:8000/sessions/<session-id>/messages/stream \
 - 每次请求都启动一个临时 Docker 容器，不保活容器
 - 为了让非交互模式先跑通，容器内命令启用了 `--dangerously-skip-permissions`
 - 为避免 Claude Code 的 root 限制，runner 会默认以当前宿主机用户的 UID/GID 运行容器
+- 阿里云模式走的是百炼官方 Anthropic 兼容接口，不是 OpenAI compatible-mode `/v1`
 
 最后这一点只适合内部 MVP。下一步如果要上线，优先补：
 

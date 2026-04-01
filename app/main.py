@@ -4,6 +4,7 @@ import sqlite3
 import subprocess
 import time
 import uuid
+from hashlib import sha256
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +13,24 @@ from time import perf_counter
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+
+
+def load_local_env() -> None:
+    env_path = Path(".env")
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+load_local_env()
 
 
 def env_or_default(name: str, default: str) -> str:
@@ -32,6 +51,20 @@ DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "demo-user")
 CONTAINER_UID = env_or_default("CLAUDE_CONTAINER_UID", str(os.getuid()))
 CONTAINER_GID = env_or_default("CLAUDE_CONTAINER_GID", str(os.getgid()))
 CONTAINER_HOME = env_or_default("CLAUDE_CONTAINER_HOME", "/home/agent")
+DEFAULT_RUNTIME_PROFILE = env_or_default("DEFAULT_RUNTIME_PROFILE", "aliyun")
+DEFAULT_CLAUDE_MODEL = env_or_default("DEFAULT_CLAUDE_MODEL", "sonnet")
+ALIYUN_ANTHROPIC_BASE_URL = env_or_default(
+    "ALIYUN_ANTHROPIC_BASE_URL",
+    "https://dashscope.aliyuncs.com/apps/anthropic",
+)
+ALIYUN_ANTHROPIC_API_KEY = env_or_default("ALIYUN_ANTHROPIC_API_KEY", "")
+ALIYUN_ANTHROPIC_AUTH_TOKEN = env_or_default("ALIYUN_ANTHROPIC_AUTH_TOKEN", "")
+ALIYUN_ANTHROPIC_MODEL = env_or_default("ALIYUN_ANTHROPIC_MODEL", "qwen3-coder-next")
+DEFAULT_APPEND_SYSTEM_PROMPT = (
+    "When you create or modify files, verify the result before claiming success. "
+    "Re-read the changed files and only say a file was updated if the workspace contents actually reflect the change. "
+    "If no file was changed, say so explicitly."
+)
 CLAUDE_ENV_VARS = [
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
@@ -137,19 +170,128 @@ def insert_message(
         conn.commit()
 
 
+def snapshot_workspace(workspace_path: Path) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
+    if not workspace_path.exists():
+        return snapshot
+
+    for path in sorted(workspace_path.rglob("*")):
+        if not path.is_file():
+            continue
+        relpath = str(path.relative_to(workspace_path))
+        digest = sha256(path.read_bytes()).hexdigest()
+        snapshot[relpath] = digest
+    return snapshot
+
+
+def diff_workspace(before: dict[str, str], after: dict[str, str]) -> dict[str, list[str]]:
+    before_keys = set(before)
+    after_keys = set(after)
+
+    added = sorted(after_keys - before_keys)
+    deleted = sorted(before_keys - after_keys)
+    modified = sorted(path for path in before_keys & after_keys if before[path] != after[path])
+    changed_files = added + modified + deleted
+
+    return {
+        "added": added,
+        "modified": modified,
+        "deleted": deleted,
+        "changed_files": changed_files,
+    }
+
+
+def should_flag_missing_changes(prompt: str, output: str) -> bool:
+    text = f"{prompt}\n{output}".lower()
+    indicators = [
+        "创建",
+        "修改",
+        "改名",
+        "重命名",
+        "写入",
+        "保存",
+        "文件",
+        "html",
+        "readme",
+        "created",
+        "updated",
+        "modified",
+        "renamed",
+        "saved",
+        "wrote",
+        "file",
+    ]
+    return any(token in text for token in indicators)
+
+
+def maybe_annotate_output(prompt: str, output: str, workspace_diff: dict[str, list[str]]) -> str:
+    if workspace_diff["changed_files"]:
+        changed = ", ".join(workspace_diff["changed_files"][:10])
+        suffix = f"\n\n[Backend note: Workspace changed files: {changed}]"
+        return f"{output}{suffix}"
+
+    if should_flag_missing_changes(prompt, output):
+        suffix = "\n\n[Backend note: No workspace file changes were detected during this run.]"
+        return f"{output}{suffix}"
+
+    return output
+
+
+def resolve_runtime_profile(profile: str | None) -> str:
+    if profile in {"default", "aliyun"}:
+        return profile
+    return DEFAULT_RUNTIME_PROFILE
+
+
+def validate_runtime_env(profile: str) -> dict[str, str]:
+    claude_env = resolve_claude_runtime_env(profile)
+    if not claude_env.get("ANTHROPIC_API_KEY") and not claude_env.get("ANTHROPIC_AUTH_TOKEN"):
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Claude auth is not configured for runtime profile '{profile}'. "
+                "Set ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN or the corresponding ALIYUN_ANTHROPIC_* variables."
+            ),
+        )
+    return claude_env
+
+
+def resolve_claude_runtime_env(profile: str) -> dict[str, str]:
+    if profile == "aliyun":
+        env_map = {
+            "ANTHROPIC_BASE_URL": ALIYUN_ANTHROPIC_BASE_URL,
+            "ANTHROPIC_MODEL": ALIYUN_ANTHROPIC_MODEL,
+        }
+        if ALIYUN_ANTHROPIC_API_KEY:
+            env_map["ANTHROPIC_API_KEY"] = ALIYUN_ANTHROPIC_API_KEY
+        if ALIYUN_ANTHROPIC_AUTH_TOKEN:
+            env_map["ANTHROPIC_AUTH_TOKEN"] = ALIYUN_ANTHROPIC_AUTH_TOKEN
+        return env_map
+
+    return {name: value for name in CLAUDE_ENV_VARS if (value := os.getenv(name))}
+
+
+def resolve_model(profile: str, requested_model: str | None) -> str:
+    model = (requested_model or "").strip()
+    if profile == "aliyun":
+        if not model or model == "sonnet":
+            return ALIYUN_ANTHROPIC_MODEL
+        return model
+
+    if not model:
+        return DEFAULT_CLAUDE_MODEL
+    return model
+
+
 def build_claude_command(
     session: dict,
     prompt: str,
     model: str,
     max_turns: int,
     append_system_prompt: str | None,
+    runtime_profile: str,
 ) -> list[str]:
-    claude_env = {name: os.getenv(name) for name in CLAUDE_ENV_VARS if os.getenv(name)}
-    if not claude_env.get("ANTHROPIC_API_KEY") and not claude_env.get("ANTHROPIC_AUTH_TOKEN"):
-        raise HTTPException(
-            status_code=500,
-            detail="Claude auth is not configured. Set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN.",
-        )
+    claude_env = validate_runtime_env(runtime_profile)
 
     workspace_path = Path(session["workspace_path"]).resolve()
     home_path = Path(session["home_path"]).resolve()
@@ -188,8 +330,10 @@ def build_claude_command(
         "--dangerously-skip-permissions",
     ]
 
+    final_system_prompt = DEFAULT_APPEND_SYSTEM_PROMPT
     if append_system_prompt:
-        command.extend(["--append-system-prompt", append_system_prompt])
+        final_system_prompt = f"{DEFAULT_APPEND_SYSTEM_PROMPT}\n\n{append_system_prompt}"
+    command.extend(["--append-system-prompt", final_system_prompt])
 
     if has_assistant_reply(session["id"]):
         command.insert(command.index("-p"), "-c")
@@ -203,13 +347,17 @@ def run_claude(
     model: str,
     max_turns: int,
     append_system_prompt: str | None,
-) -> tuple[str, int, int]:
+    runtime_profile: str,
+) -> tuple[str, int, int, dict[str, list[str]]]:
+    workspace_path = Path(session["workspace_path"]).resolve()
+    before_snapshot = snapshot_workspace(workspace_path)
     command = build_claude_command(
         session=session,
         prompt=prompt,
         model=model,
         max_turns=max_turns,
         append_system_prompt=append_system_prompt,
+        runtime_profile=runtime_profile,
     )
 
     started = perf_counter()
@@ -234,7 +382,10 @@ def run_claude(
         detail = stderr or stdout or f"Claude failed with exit code {completed.returncode}"
         raise HTTPException(status_code=500, detail=detail)
 
-    return stdout, completed.returncode, duration_ms
+    workspace_diff = diff_workspace(before_snapshot, snapshot_workspace(workspace_path))
+    annotated_output = maybe_annotate_output(prompt, stdout, workspace_diff)
+
+    return annotated_output, completed.returncode, duration_ms, workspace_diff
 
 
 def sse_event(event: str, data: dict) -> str:
@@ -258,13 +409,17 @@ def stream_claude(
     model: str,
     max_turns: int,
     append_system_prompt: str | None,
+    runtime_profile: str,
 ):
+    workspace_path = Path(session["workspace_path"]).resolve()
+    before_snapshot = snapshot_workspace(workspace_path)
     command = build_claude_command(
         session=session,
         prompt=prompt,
         model=model,
         max_turns=max_turns,
         append_system_prompt=append_system_prompt,
+        runtime_profile=runtime_profile,
     )
 
     started = perf_counter()
@@ -327,10 +482,13 @@ def stream_claude(
         )
         return
 
+    workspace_diff = diff_workspace(before_snapshot, snapshot_workspace(workspace_path))
+    annotated_output = maybe_annotate_output(prompt, output, workspace_diff)
+
     insert_message(
         session_id=session["id"],
         role="assistant",
-        content=output,
+        content=annotated_output,
         exit_code=exit_code,
         duration_ms=duration_ms,
     )
@@ -338,9 +496,13 @@ def stream_claude(
     yield sse_event(
         "done",
         {
-            "output": output,
+            "output": annotated_output,
             "exit_code": exit_code,
             "duration_ms": duration_ms,
+            "changed_files": workspace_diff["changed_files"],
+            "added_files": workspace_diff["added"],
+            "modified_files": workspace_diff["modified"],
+            "deleted_files": workspace_diff["deleted"],
         },
     )
 
@@ -362,9 +524,10 @@ class CreateSessionRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str = Field(min_length=1)
-    model: str = Field(default="sonnet")
+    model: str | None = None
     max_turns: int = Field(default=8, ge=1, le=20)
     append_system_prompt: str | None = None
+    runtime_profile: str | None = None
 
 
 @app.get("/")
@@ -445,13 +608,17 @@ def list_messages(session_id: str) -> dict:
 def send_message(session_id: str, payload: SendMessageRequest) -> dict:
     session = fetch_session(session_id)
     insert_message(session_id=session_id, role="user", content=payload.content)
+    runtime_profile = resolve_runtime_profile(payload.runtime_profile)
+    model = resolve_model(runtime_profile, payload.model)
+    validate_runtime_env(runtime_profile)
 
-    output, exit_code, duration_ms = run_claude(
+    output, exit_code, duration_ms, workspace_diff = run_claude(
         session=session,
         prompt=payload.content,
-        model=payload.model,
+        model=model,
         max_turns=payload.max_turns,
         append_system_prompt=payload.append_system_prompt,
+        runtime_profile=runtime_profile,
     )
 
     insert_message(
@@ -467,6 +634,12 @@ def send_message(session_id: str, payload: SendMessageRequest) -> dict:
         "output": output,
         "exit_code": exit_code,
         "duration_ms": duration_ms,
+        "runtime_profile": runtime_profile,
+        "model": model,
+        "changed_files": workspace_diff["changed_files"],
+        "added_files": workspace_diff["added"],
+        "modified_files": workspace_diff["modified"],
+        "deleted_files": workspace_diff["deleted"],
     }
 
 
@@ -474,6 +647,9 @@ def send_message(session_id: str, payload: SendMessageRequest) -> dict:
 def send_message_stream(session_id: str, payload: SendMessageRequest) -> StreamingResponse:
     session = fetch_session(session_id)
     insert_message(session_id=session_id, role="user", content=payload.content)
+    runtime_profile = resolve_runtime_profile(payload.runtime_profile)
+    model = resolve_model(runtime_profile, payload.model)
+    validate_runtime_env(runtime_profile)
 
     headers = {
         "Cache-Control": "no-cache",
@@ -485,10 +661,33 @@ def send_message_stream(session_id: str, payload: SendMessageRequest) -> Streami
         stream_claude(
             session=session,
             prompt=payload.content,
-            model=payload.model,
+            model=model,
             max_turns=payload.max_turns,
             append_system_prompt=payload.append_system_prompt,
+            runtime_profile=runtime_profile,
         ),
         media_type="text/event-stream",
         headers=headers,
     )
+
+
+@app.get("/runtime-profiles")
+def list_runtime_profiles() -> dict:
+    return {
+        "default_runtime_profile": DEFAULT_RUNTIME_PROFILE,
+        "items": [
+            {
+                "id": "default",
+                "label": "Claude Default",
+                "default_model": DEFAULT_CLAUDE_MODEL,
+                "configured": bool(resolve_claude_runtime_env("default").get("ANTHROPIC_API_KEY") or resolve_claude_runtime_env("default").get("ANTHROPIC_AUTH_TOKEN")),
+            },
+            {
+                "id": "aliyun",
+                "label": "Claude via Aliyun",
+                "default_model": ALIYUN_ANTHROPIC_MODEL,
+                "configured": bool(ALIYUN_ANTHROPIC_API_KEY or ALIYUN_ANTHROPIC_AUTH_TOKEN),
+                "base_url": ALIYUN_ANTHROPIC_BASE_URL,
+            },
+        ],
+    }
