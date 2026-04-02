@@ -45,6 +45,7 @@ def env_or_default(name: str, default: str) -> str:
 
 
 DATA_ROOT = Path(os.getenv("AGENT_DATA_ROOT", "./data")).resolve()
+HOST_AGENT_DATA_ROOT = Path(env_or_default("HOST_AGENT_DATA_ROOT", str(DATA_ROOT))).resolve()
 SESSIONS_ROOT = DATA_ROOT / "agent-sessions"
 DATABASE_PATH = DATA_ROOT / "app.db"
 STATIC_ROOT = Path(__file__).resolve().parent / "static"
@@ -57,6 +58,8 @@ APP_RUNTIME_IMAGE = env_or_default("APP_RUNTIME_IMAGE", "node:20-slim")
 APP_RUNTIME_MEMORY = env_or_default("APP_RUNTIME_MEMORY", "2g")
 APP_RUNTIME_CPUS = env_or_default("APP_RUNTIME_CPUS", "1")
 APP_RUNTIME_INTERNAL_PORT = int(env_or_default("APP_RUNTIME_INTERNAL_PORT", "3000"))
+PYTHON_RUNTIME_IMAGE = env_or_default("PYTHON_RUNTIME_IMAGE", "python:3.11-slim")
+PYTHON_RUNTIME_INTERNAL_PORT = int(env_or_default("PYTHON_RUNTIME_INTERNAL_PORT", "8000"))
 APP_RUNTIME_START_TIMEOUT_SECONDS = int(env_or_default("APP_RUNTIME_START_TIMEOUT_SECONDS", "30"))
 DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "demo-user")
 CONTAINER_UID = env_or_default("CLAUDE_CONTAINER_UID", str(os.getuid()))
@@ -75,7 +78,11 @@ ALIYUN_ANTHROPIC_MODEL = env_or_default("ALIYUN_ANTHROPIC_MODEL", "qwen3-coder-n
 DEFAULT_APPEND_SYSTEM_PROMPT = (
     "When you create or modify files, verify the result before claiming success. "
     "Re-read the changed files and only say a file was updated if the workspace contents actually reflect the change. "
-    "If no file was changed, say so explicitly."
+    "If no file was changed, say so explicitly. "
+    "Agent-Do browser preview supports static HTML, Node web apps, and Python HTTP apps. "
+    "If the user expects an in-browser preview, prefer HTML/Canvas/JavaScript or a web app. "
+    "Avoid pygame, tkinter, curses, turtle, or other desktop Python UI/game frameworks unless the user explicitly asks for a desktop app. "
+    "When generating a previewable Python project, prefer FastAPI, Flask, Streamlit, or another HTTP server, and add .agentdo/project.json with runtime/start/install/port when useful."
 )
 CLAUDE_ENV_VARS = [
     "ANTHROPIC_API_KEY",
@@ -83,6 +90,22 @@ CLAUDE_ENV_VARS = [
     "ANTHROPIC_BASE_URL",
     "ANTHROPIC_CUSTOM_HEADERS",
 ]
+HTTP_RUNTIME_MODES = {"node", "python_web"}
+IGNORED_WORKSPACE_DIRS = {
+    ".agentdo",
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".pytest_cache",
+    "node_modules",
+    "dist",
+    "build",
+}
+PYTHON_DESKTOP_IMPORTS = {"arcade", "curses", "pygame", "pyglet", "tkinter", "turtle", "ursina"}
 
 
 def utc_now() -> str:
@@ -92,6 +115,15 @@ def utc_now() -> str:
 def ensure_data_dirs() -> None:
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     SESSIONS_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def resolve_runtime_mount_source(path: Path | str) -> Path:
+    resolved = Path(path).resolve()
+    try:
+        relative = resolved.relative_to(DATA_ROOT)
+    except ValueError:
+        return resolved
+    return (HOST_AGENT_DATA_ROOT / relative).resolve()
 
 
 def get_conn() -> sqlite3.Connection:
@@ -686,6 +718,20 @@ def normalize_shell_command(value) -> str | None:
     return None
 
 
+def normalize_relative_path(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().replace("\\", "/")
+    return text or None
+
+
+def parse_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def load_json_file(path: Path) -> dict | None:
     if not path.exists():
         return None
@@ -713,30 +759,402 @@ def detect_static_entry(workspace_path: Path) -> str | None:
     return None
 
 
-def detect_runtime_spec(workspace_path: Path) -> dict:
-    manifest = load_json_file(workspace_path / ".agentdo" / "project.json") or {}
+def resolve_workspace_relative_path(workspace_path: Path, relative_path: str | None) -> Path | None:
+    if not relative_path:
+        return None
+    target = (workspace_path / relative_path).resolve()
+    try:
+        target.relative_to(workspace_path)
+    except ValueError:
+        return None
+    return target
 
-    if manifest.get("start"):
+
+def normalize_runtime_mode(value) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "html": "static",
+        "static": "static",
+        "static_html": "static",
+        "web_static": "static",
+        "js": "node",
+        "javascript": "node",
+        "node": "node",
+        "nodejs": "node",
+        "python": "python_web",
+        "python_http": "python_web",
+        "python_web": "python_web",
+        "fastapi": "python_web",
+        "flask": "python_web",
+        "streamlit": "python_web",
+        "django": "python_web",
+        "python_desktop": "python_desktop",
+        "python_game": "python_desktop",
+        "desktop_python": "python_desktop",
+        "desktop_game": "python_desktop",
+        "pygame": "python_desktop",
+        "pyglet": "python_desktop",
+        "arcade": "python_desktop",
+        "tkinter": "python_desktop",
+        "curses": "python_desktop",
+        "turtle": "python_desktop",
+    }
+    return aliases.get(normalized)
+
+
+def is_http_runtime_mode(mode: str | None) -> bool:
+    return bool(mode in HTTP_RUNTIME_MODES)
+
+
+def runtime_image_for_mode(mode: str) -> str:
+    if mode == "node":
+        return APP_RUNTIME_IMAGE
+    if mode == "python_web":
+        return PYTHON_RUNTIME_IMAGE
+    raise HTTPException(status_code=500, detail=f"Unsupported runtime mode: {mode}")
+
+
+def default_internal_port_for_mode(mode: str | None) -> int:
+    return PYTHON_RUNTIME_INTERNAL_PORT if mode == "python_web" else APP_RUNTIME_INTERNAL_PORT
+
+
+def should_ignore_workspace_path(path: Path) -> bool:
+    return any(part in IGNORED_WORKSPACE_DIRS for part in path.parts)
+
+
+def list_python_files(workspace_path: Path, preferred_entry: str | None = None) -> list[Path]:
+    files = [
+        path
+        for path in workspace_path.rglob("*.py")
+        if path.is_file() and not should_ignore_workspace_path(path.relative_to(workspace_path))
+    ]
+    preferred_target = resolve_workspace_relative_path(workspace_path, preferred_entry)
+
+    def sort_key(path: Path) -> tuple[int, int, str]:
+        relpath = path.relative_to(workspace_path)
+        priority = 5
+        if preferred_target and path == preferred_target:
+            priority = 0
+        elif relpath.name == "manage.py":
+            priority = 1
+        elif relpath.name in {"app.py", "main.py", "server.py", "run.py"}:
+            priority = 2
+        return (priority, len(relpath.parts), str(relpath))
+
+    return sorted(files, key=sort_key)
+
+
+def read_text_if_possible(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def extract_python_import_roots(source: str) -> set[str]:
+    return {
+        match.group(1)
+        for match in re.finditer(r"^\s*(?:from|import)\s+([A-Za-z_][A-Za-z0-9_]*)", source, re.MULTILINE)
+    }
+
+
+def python_module_from_path(workspace_path: Path, file_path: Path) -> str | None:
+    relpath = file_path.relative_to(workspace_path).with_suffix("")
+    parts = list(relpath.parts)
+    if not parts or any(not part.isidentifier() for part in parts):
+        return None
+    return ".".join(parts)
+
+
+def build_python_install_command(workspace_path: Path, packages: list[str] | None = None) -> str | None:
+    requirements = workspace_path / "requirements.txt"
+    if requirements.exists():
+        return "python -m pip install --disable-pip-version-check -r requirements.txt"
+    packages = [package for package in (packages or []) if package]
+    if packages:
+        deduped = list(dict.fromkeys(packages))
+        return "python -m pip install --disable-pip-version-check " + shlex.join(deduped)
+    return None
+
+
+def build_python_desktop_spec(
+    entry_file: str | None,
+    message: str | None = None,
+) -> dict:
+    return {
+        "mode": "python_desktop",
+        "entry_file": entry_file,
+        "install_command": None,
+        "start_command": None,
+        "internal_port": None,
+        "message": message
+        or "检测到 Python 桌面/pygame/tkinter 游戏项目，当前浏览器预览不支持这类本地窗口程序。请改为 HTML/Canvas、Node Web，或 Python HTTP 项目。",
+    }
+
+
+def detect_python_runtime_spec(
+    workspace_path: Path,
+    preferred_entry: str | None = None,
+    runtime_hint: str | None = None,
+    install_command_override: str | None = None,
+    start_command_override: str | None = None,
+    internal_port: int | None = None,
+) -> dict | None:
+    python_files = list_python_files(workspace_path, preferred_entry=preferred_entry)
+    if not python_files and runtime_hint not in {"python_web", "python_desktop"}:
+        return None
+
+    port = internal_port or PYTHON_RUNTIME_INTERNAL_PORT
+    first_python_file = None
+    desktop_entry = None
+    desktop_modules: set[str] = set()
+    fastapi_candidate = None
+    flask_candidate = None
+    streamlit_candidate = None
+    django_candidate = None
+
+    for path in python_files:
+        relpath = str(path.relative_to(workspace_path))
+        source = read_text_if_possible(path)
+        imports = extract_python_import_roots(source)
+        if first_python_file is None:
+            first_python_file = relpath
+
+        blocked_modules = imports & PYTHON_DESKTOP_IMPORTS
+        if blocked_modules and desktop_entry is None:
+            desktop_entry = relpath
+            desktop_modules = blocked_modules
+
+        if django_candidate is None and path.name == "manage.py" and (
+            "django" in imports or "execute_from_command_line" in source
+        ):
+            django_candidate = relpath
+
+        if streamlit_candidate is None and "streamlit" in imports:
+            streamlit_candidate = relpath
+
+        if fastapi_candidate is None and "fastapi" in imports:
+            match = re.search(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*FastAPI\s*\(", source, re.MULTILINE)
+            if match:
+                module_name = python_module_from_path(workspace_path, path)
+                if module_name:
+                    fastapi_candidate = {
+                        "entry_file": relpath,
+                        "app_var": match.group(1),
+                        "module_name": module_name,
+                    }
+
+        if flask_candidate is None and "flask" in imports:
+            match = re.search(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*Flask\s*\(", source, re.MULTILINE)
+            if match:
+                module_name = python_module_from_path(workspace_path, path)
+                if module_name:
+                    flask_candidate = {
+                        "entry_file": relpath,
+                        "app_var": match.group(1),
+                        "module_name": module_name,
+                    }
+
+    has_web_candidate = any((fastapi_candidate, flask_candidate, streamlit_candidate, django_candidate))
+    if runtime_hint == "python_desktop":
+        return build_python_desktop_spec(entry_file=desktop_entry or first_python_file)
+    if desktop_entry and not has_web_candidate:
+        modules = ", ".join(sorted(desktop_modules))
+        return build_python_desktop_spec(
+            entry_file=desktop_entry,
+            message=f"检测到 Python 桌面/小游戏框架（{modules}），当前浏览器预览不支持这类本地窗口程序。请改为 HTML/Canvas、Node Web，或 Python HTTP 项目。",
+        )
+
+    if fastapi_candidate:
         return {
-            "mode": "node",
-            "entry_file": detect_static_entry(workspace_path),
-            "install_command": normalize_shell_command(manifest.get("install")) or "npm install",
-            "start_command": normalize_shell_command(manifest.get("start")),
-            "internal_port": int(manifest.get("port", APP_RUNTIME_INTERNAL_PORT)),
+            "mode": "python_web",
+            "entry_file": fastapi_candidate["entry_file"],
+            "install_command": install_command_override
+            or build_python_install_command(workspace_path, ["fastapi", "uvicorn"]),
+            "start_command": start_command_override
+            or f"python -m uvicorn {fastapi_candidate['module_name']}:{fastapi_candidate['app_var']} --host 0.0.0.0 --port {port}",
+            "internal_port": port,
+            "message": None,
         }
 
-    if manifest.get("entry"):
-        entry_file = str(manifest["entry"])
-        if (workspace_path / entry_file).is_file():
+    if flask_candidate:
+        return {
+            "mode": "python_web",
+            "entry_file": flask_candidate["entry_file"],
+            "install_command": install_command_override or build_python_install_command(workspace_path, ["flask"]),
+            "start_command": start_command_override
+            or f"python -m flask --app {flask_candidate['module_name']}:{flask_candidate['app_var']} run --host 0.0.0.0 --port {port}",
+            "internal_port": port,
+            "message": None,
+        }
+
+    if streamlit_candidate:
+        return {
+            "mode": "python_web",
+            "entry_file": streamlit_candidate,
+            "install_command": install_command_override
+            or build_python_install_command(workspace_path, ["streamlit"]),
+            "start_command": start_command_override
+            or f"python -m streamlit run {shlex.quote(streamlit_candidate)} --server.address 0.0.0.0 --server.port {port}",
+            "internal_port": port,
+            "message": None,
+        }
+
+    if django_candidate:
+        return {
+            "mode": "python_web",
+            "entry_file": django_candidate,
+            "install_command": install_command_override or build_python_install_command(workspace_path, ["django"]),
+            "start_command": start_command_override or f"python manage.py runserver 0.0.0.0:{port}",
+            "internal_port": port,
+            "message": None,
+        }
+
+    if runtime_hint == "python_web":
+        return {
+            "mode": "python_web",
+            "entry_file": preferred_entry or first_python_file,
+            "install_command": install_command_override or build_python_install_command(workspace_path),
+            "start_command": start_command_override,
+            "internal_port": port,
+            "message": (
+                None
+                if start_command_override
+                else "检测到 Python 项目，但未识别出可直接启动的 FastAPI、Flask、Streamlit 或 Django 入口。可在 .agentdo/project.json 里补充 runtime/start/install/port。"
+            ),
+        }
+
+    return None
+
+
+def infer_manifest_runtime_mode(
+    runtime_hint: str | None,
+    entry_file: str | None,
+    install_command: str | None,
+    start_command: str | None,
+    package_json_present: bool,
+) -> str | None:
+    if runtime_hint:
+        return runtime_hint
+
+    text = " ".join(part for part in [entry_file, install_command, start_command] if part).lower()
+    if any(token in text for token in ("npm", "node", "pnpm", "yarn", "vite", "next", "nuxt", "bun")):
+        return "node"
+    if entry_file and entry_file.endswith(".html"):
+        return "static"
+    if entry_file and entry_file.endswith(".py"):
+        return "python_web"
+    if any(token in text for token in ("uvicorn", "flask", "streamlit", "django", "gunicorn", "python", "pip")):
+        return "python_web"
+    if package_json_present:
+        return "node"
+    return None
+
+
+def build_http_runtime_boot_command(spec: dict) -> str:
+    install_command = spec.get("install_command")
+    start_command = spec.get("start_command")
+    if not start_command:
+        raise HTTPException(status_code=500, detail="Missing runtime start command.")
+
+    if spec["mode"] == "node":
+        if install_command:
+            return f"set -e; if [ ! -d node_modules ]; then {install_command}; fi; {start_command}"
+        return start_command
+
+    if spec["mode"] == "python_web":
+        commands = [
+            "set -e",
+            "mkdir -p .agentdo",
+            "if [ ! -x .agentdo/preview-venv/bin/python ]; then python -m venv .agentdo/preview-venv; fi",
+            ". .agentdo/preview-venv/bin/activate",
+        ]
+        if install_command:
+            commands.append(install_command)
+        commands.append(start_command)
+        return "; ".join(commands)
+
+    raise HTTPException(status_code=500, detail=f"Unsupported runtime mode: {spec['mode']}")
+
+
+def detect_runtime_spec(workspace_path: Path) -> dict:
+    manifest = load_json_file(workspace_path / ".agentdo" / "project.json") or {}
+    manifest_runtime_hint = normalize_runtime_mode(manifest.get("runtime"))
+    manifest_entry = normalize_relative_path(manifest.get("entry"))
+    manifest_install_command = normalize_shell_command(manifest.get("install"))
+    manifest_start_command = normalize_shell_command(manifest.get("start"))
+    manifest_port = parse_int(
+        manifest.get("port"),
+        PYTHON_RUNTIME_INTERNAL_PORT if manifest_runtime_hint == "python_web" else APP_RUNTIME_INTERNAL_PORT,
+    )
+    package_json = load_json_file(workspace_path / "package.json")
+
+    if manifest_runtime_hint == "python_desktop":
+        return build_python_desktop_spec(entry_file=manifest_entry)
+
+    if manifest_start_command:
+        inferred_mode = infer_manifest_runtime_mode(
+            runtime_hint=manifest_runtime_hint,
+            entry_file=manifest_entry,
+            install_command=manifest_install_command,
+            start_command=manifest_start_command,
+            package_json_present=bool(package_json),
+        )
+        if inferred_mode == "static":
+            entry_target = resolve_workspace_relative_path(workspace_path, manifest_entry)
+            if entry_target and entry_target.is_file():
+                return {
+                    "mode": "static",
+                    "entry_file": str(entry_target.relative_to(workspace_path)),
+                    "install_command": None,
+                    "start_command": None,
+                    "internal_port": None,
+                    "message": None,
+                }
+        if inferred_mode == "node":
             return {
-                "mode": "static",
-                "entry_file": entry_file,
-                "install_command": normalize_shell_command(manifest.get("install")),
-                "start_command": normalize_shell_command(manifest.get("start")),
-                "internal_port": int(manifest.get("port", APP_RUNTIME_INTERNAL_PORT)),
+                "mode": "node",
+                "entry_file": detect_static_entry(workspace_path),
+                "install_command": manifest_install_command or "npm install",
+                "start_command": manifest_start_command,
+                "internal_port": parse_int(manifest.get("port"), APP_RUNTIME_INTERNAL_PORT),
+                "message": None,
             }
 
-    package_json = load_json_file(workspace_path / "package.json")
+        python_manifest_spec = detect_python_runtime_spec(
+            workspace_path,
+            preferred_entry=manifest_entry,
+            runtime_hint="python_web" if inferred_mode == "python_web" else manifest_runtime_hint,
+            install_command_override=manifest_install_command,
+            start_command_override=manifest_start_command,
+            internal_port=parse_int(manifest.get("port"), PYTHON_RUNTIME_INTERNAL_PORT),
+        )
+        if python_manifest_spec:
+            return python_manifest_spec
+
+        return {
+            "mode": inferred_mode or "unknown",
+            "entry_file": manifest_entry,
+            "install_command": manifest_install_command,
+            "start_command": manifest_start_command,
+            "internal_port": manifest_port if inferred_mode and inferred_mode != "static" else None,
+            "message": "检测到了自定义运行命令，但无法判断这是哪种可预览项目。建议在 .agentdo/project.json 中显式设置 runtime。",
+        }
+
+    if manifest_entry:
+        entry_target = resolve_workspace_relative_path(workspace_path, manifest_entry)
+        if entry_target and entry_target.is_file() and entry_target.suffix.lower() == ".html":
+            return {
+                "mode": "static",
+                "entry_file": str(entry_target.relative_to(workspace_path)),
+                "install_command": None,
+                "start_command": None,
+                "internal_port": None,
+                "message": None,
+            }
+
     if package_json:
         scripts = package_json.get("scripts") or {}
         internal_port = APP_RUNTIME_INTERNAL_PORT
@@ -754,6 +1172,40 @@ def detect_runtime_spec(workspace_path: Path) -> dict:
             "install_command": install_command,
             "start_command": start_command,
             "internal_port": internal_port,
+            "message": None,
+        }
+
+    python_spec = detect_python_runtime_spec(
+        workspace_path,
+        preferred_entry=manifest_entry,
+        runtime_hint=manifest_runtime_hint,
+        install_command_override=manifest_install_command if manifest_runtime_hint == "python_web" else None,
+        internal_port=parse_int(
+            manifest.get("port"),
+            PYTHON_RUNTIME_INTERNAL_PORT if manifest_runtime_hint == "python_web" else PYTHON_RUNTIME_INTERNAL_PORT,
+        ),
+    )
+    if python_spec:
+        return python_spec
+
+    if manifest_runtime_hint == "node":
+        return {
+            "mode": "node",
+            "entry_file": detect_static_entry(workspace_path),
+            "install_command": manifest_install_command or "npm install",
+            "start_command": manifest_start_command,
+            "internal_port": parse_int(manifest.get("port"), APP_RUNTIME_INTERNAL_PORT),
+            "message": "manifest 指定了 Node 项目，但当前 workspace 里没有可识别的 dev/start 脚本。请在 .agentdo/project.json 中补充 start 命令，或提供 package.json scripts。",
+        }
+
+    if manifest_runtime_hint == "python_web":
+        return {
+            "mode": "python_web",
+            "entry_file": manifest_entry,
+            "install_command": manifest_install_command or build_python_install_command(workspace_path),
+            "start_command": manifest_start_command,
+            "internal_port": parse_int(manifest.get("port"), PYTHON_RUNTIME_INTERNAL_PORT),
+            "message": "manifest 指定了 Python Web 项目，但当前没有识别出可启动的 HTTP 入口。请在 .agentdo/project.json 中补充 start 命令。",
         }
 
     entry_file = detect_static_entry(workspace_path)
@@ -764,6 +1216,7 @@ def detect_runtime_spec(workspace_path: Path) -> dict:
             "install_command": None,
             "start_command": None,
             "internal_port": None,
+            "message": None,
         }
 
     return {
@@ -772,6 +1225,7 @@ def detect_runtime_spec(workspace_path: Path) -> dict:
         "install_command": None,
         "start_command": None,
         "internal_port": None,
+        "message": None,
     }
 
 
@@ -827,7 +1281,7 @@ def wait_for_port(host: str, port: int, timeout_seconds: int) -> bool:
 
 
 def refresh_runtime_record(record: dict | None) -> dict | None:
-    if not record or record["mode"] != "node" or not record.get("container_name"):
+    if not record or not is_http_runtime_mode(record["mode"]) or not record.get("container_name"):
         return record
 
     inspect_data = inspect_container(record["container_name"])
@@ -849,7 +1303,10 @@ def refresh_runtime_record(record: dict | None) -> dict | None:
 
     state = inspect_data.get("State", {})
     running = bool(state.get("Running"))
-    host_port = extract_host_port(inspect_data, int(record.get("internal_port") or APP_RUNTIME_INTERNAL_PORT))
+    host_port = extract_host_port(
+        inspect_data,
+        int(record.get("internal_port") or default_internal_port_for_mode(record.get("mode"))),
+    )
 
     if running:
         if record["status"] != "running" or record.get("host_port") != host_port:
@@ -887,13 +1344,15 @@ def build_runtime_payload(session: dict) -> dict:
     workspace_path = Path(session["workspace_path"]).resolve()
     spec = detect_runtime_spec(workspace_path)
     record = refresh_runtime_record(fetch_runtime_record(session["id"]))
+    if record and record["mode"] != spec["mode"]:
+        record = None
 
     mode = spec["mode"]
     status = "not_available"
     can_start = False
     can_preview = False
     preview_url = None
-    last_error = None
+    last_error = spec.get("message")
     host_port = None
 
     if mode == "static":
@@ -904,22 +1363,28 @@ def build_runtime_payload(session: dict) -> dict:
             if can_preview
             else None
         )
-    elif mode == "node":
-        can_start = True
+    elif is_http_runtime_mode(mode):
         if spec.get("start_command") is None:
             status = "not_configured"
-            last_error = "检测到了 package.json，但没有可识别的 dev/start 脚本。"
+            if not last_error:
+                if mode == "node":
+                    last_error = "检测到了 package.json，但没有可识别的 dev/start 脚本。"
+                else:
+                    last_error = "检测到了 Python Web 项目，但没有可识别的启动命令。"
         else:
+            can_start = True
             status = "stopped"
             if record:
                 status = record["status"]
-                last_error = record.get("last_error")
+                last_error = record.get("last_error") or last_error
                 host_port = record.get("host_port")
                 if status == "running":
                     can_preview = True
                     preview_url = f"/sessions/{session['id']}/preview/"
+    elif mode == "python_desktop":
+        last_error = last_error or "检测到 Python 桌面项目，当前浏览器预览不支持。"
     else:
-        last_error = "当前 workspace 中没有可预览的静态页面，也没有可运行的 Node 项目。"
+        last_error = "当前 workspace 中没有可预览的静态页面，也没有可运行的 Web 项目。"
 
     return {
         "session_id": session["id"],
@@ -941,6 +1406,8 @@ def build_runtime_payload(session: dict) -> dict:
 def start_runtime_for_session(session: dict) -> dict:
     workspace_path = Path(session["workspace_path"]).resolve()
     home_path = Path(session["home_path"]).resolve()
+    runtime_workspace_path = resolve_runtime_mount_source(workspace_path)
+    runtime_home_path = resolve_runtime_mount_source(home_path)
     spec = detect_runtime_spec(workspace_path)
 
     if spec["mode"] == "static":
@@ -952,17 +1419,23 @@ def start_runtime_for_session(session: dict) -> dict:
         )
         return build_runtime_payload(session)
 
-    if spec["mode"] != "node":
-        raise HTTPException(status_code=400, detail="当前 session 没有可在线运行的项目。")
+    if not is_http_runtime_mode(spec["mode"]):
+        raise HTTPException(
+            status_code=400,
+            detail=spec.get("message") or "当前 session 没有可在线运行的项目。",
+        )
 
     if not spec.get("start_command"):
-        raise HTTPException(status_code=400, detail="检测到了 package.json，但没有可运行的 dev/start 脚本。")
+        raise HTTPException(
+            status_code=400,
+            detail=spec.get("message") or "检测到了可预览项目，但没有可运行的启动命令。",
+        )
 
     container_name = runtime_container_name(session["id"])
     remove_runtime_container(container_name)
     upsert_runtime_record(
         session_id=session["id"],
-        mode="node",
+        mode=spec["mode"],
         status="starting",
         entry_file=spec.get("entry_file"),
         container_name=container_name,
@@ -973,11 +1446,7 @@ def start_runtime_for_session(session: dict) -> dict:
         last_error=None,
     )
 
-    install_command = spec.get("install_command")
-    if install_command:
-        boot_command = f"set -e; if [ ! -d node_modules ]; then {install_command}; fi; {spec['start_command']}"
-    else:
-        boot_command = spec["start_command"]
+    boot_command = build_http_runtime_boot_command(spec)
 
     run_command(
         [
@@ -998,15 +1467,17 @@ def start_runtime_for_session(session: dict) -> dict:
             "HOST=0.0.0.0",
             "-e",
             f"PORT={spec['internal_port']}",
+            "-e",
+            "PYTHONUNBUFFERED=1",
             "-v",
-            f"{workspace_path}:/workspace",
+            f"{runtime_workspace_path}:/workspace",
             "-v",
-            f"{home_path}:{CONTAINER_HOME}",
+            f"{runtime_home_path}:{CONTAINER_HOME}",
             "-w",
             "/workspace",
             "-p",
             f"127.0.0.1::{spec['internal_port']}",
-            APP_RUNTIME_IMAGE,
+            runtime_image_for_mode(spec["mode"]),
             "sh",
             "-lc",
             boot_command,
@@ -1021,7 +1492,7 @@ def start_runtime_for_session(session: dict) -> dict:
         remove_runtime_container(container_name)
         upsert_runtime_record(
             session_id=session["id"],
-            mode="node",
+            mode=spec["mode"],
             status="failed",
             entry_file=spec.get("entry_file"),
             container_name=container_name,
@@ -1035,7 +1506,7 @@ def start_runtime_for_session(session: dict) -> dict:
 
     upsert_runtime_record(
         session_id=session["id"],
-        mode="node",
+        mode=spec["mode"],
         status="running",
         entry_file=spec.get("entry_file"),
         container_name=container_name,
@@ -1182,8 +1653,8 @@ def build_claude_command(
 ) -> list[str]:
     claude_env = validate_runtime_env(runtime_profile)
 
-    workspace_path = Path(session["workspace_path"]).resolve()
-    home_path = Path(session["home_path"]).resolve()
+    workspace_path = resolve_runtime_mount_source(session["workspace_path"])
+    home_path = resolve_runtime_mount_source(session["home_path"])
     env_args = ["-e", f"HOME={CONTAINER_HOME}"]
     for name, value in claude_env.items():
         env_args.extend(["-e", f"{name}={value}"])
@@ -1523,6 +1994,14 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Agent-Do MVP", lifespan=lifespan)
 
 
+@app.middleware("http")
+async def add_no_store_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/sessions/") or request.url.path in {"/sessions", "/runtime-profiles"}:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
+
+
 class CreateSessionRequest(BaseModel):
     user_id: str = Field(default=DEFAULT_USER_ID)
     title: str | None = None
@@ -1643,7 +2122,14 @@ def get_runtime(session_id: str) -> dict:
 def start_runtime(session_id: str, payload: RuntimeActionRequest | None = None) -> dict:
     session = fetch_session(session_id)
     existing = refresh_runtime_record(fetch_runtime_record(session["id"]))
-    if existing and existing["mode"] == "node" and existing["status"] == "running" and not (payload and payload.restart):
+    spec = detect_runtime_spec(Path(session["workspace_path"]).resolve())
+    if (
+        existing
+        and existing["mode"] == spec["mode"]
+        and is_http_runtime_mode(existing["mode"])
+        and existing["status"] == "running"
+        and not (payload and payload.restart)
+    ):
         return build_runtime_payload(session)
     if payload and payload.restart:
         stop_runtime_for_session(session)
@@ -1675,7 +2161,7 @@ def preview_session(session_id: str, request: Request, preview_path: str = ""):
     session = fetch_session(session_id)
     runtime = build_runtime_payload(session)
 
-    if runtime["mode"] == "node":
+    if is_http_runtime_mode(runtime["mode"]):
         if runtime["status"] != "running" or not runtime.get("host_port"):
             raise HTTPException(status_code=409, detail="项目尚未运行，请先启动预览。")
         return proxy_runtime_response(int(runtime["host_port"]), preview_path, request)

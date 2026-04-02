@@ -1,0 +1,42 @@
+name: agentdo
+
+services:
+  agentdo:
+    image: agentdo:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${AGENTDO_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      AGENT_DATA_ROOT: ${AGENTDO_CONTAINER_DATA_ROOT:-/var/lib/agentdo}
+      HOST_AGENT_DATA_ROOT: ${AGENTDO_HOST_DATA_ROOT:?set AGENTDO_HOST_DATA_ROOT to an absolute host path}
+      CLAUDE_DOCKER_IMAGE: ${CLAUDE_DOCKER_IMAGE:-claude-runtime:latest}
+      APP_RUNTIME_IMAGE: ${APP_RUNTIME_IMAGE:-node:20-slim}
+      PYTHON_RUNTIME_IMAGE: ${PYTHON_RUNTIME_IMAGE:-python:3.11-slim}
+      CLAUDE_CONTAINER_UID: ${CLAUDE_CONTAINER_UID:-1000}
+      CLAUDE_CONTAINER_GID: ${CLAUDE_CONTAINER_GID:-1000}
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+      - type: bind
+        source: ${AGENTDO_HOST_DATA_ROOT:?set AGENTDO_HOST_DATA_ROOT to an absolute host path}
+        target: ${AGENTDO_CONTAINER_DATA_ROOT:-/var/lib/agentdo}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  claude-runtime-image:
+    profiles: ["build"]
+    image: ${CLAUDE_DOCKER_IMAGE:-claude-runtime:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.claude

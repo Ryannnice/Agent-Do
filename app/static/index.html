@@ -1397,16 +1397,21 @@
 
     function resetWorkspaceView() {
       setCurrentSessionState(null);
+      currentRuntime = null;
       currentMessages = [];
       chatTitleEl.textContent = "未选择 Session";
       chatSubtitleEl.textContent = "先选择左侧一个 session，或者创建新的 session。";
       messageSummaryEl.textContent = "消息会显示在这里。";
       messagesEl.innerHTML = "";
+      previewStartBtn.disabled = true;
       clearPreview("先创建一个 session，再生成页面或项目。");
     }
 
     async function fetchJson(url, options) {
-      const response = await fetch(url, options);
+      const response = await fetch(url, {
+        cache: "no-store",
+        ...(options || {})
+      });
       if (!response.ok) {
         let detail = response.statusText;
         try {
@@ -1516,8 +1521,34 @@
       return currentMessages;
     }
 
+    function isHttpRuntimeMode(mode) {
+      return mode === "node" || mode === "python_web";
+    }
+
+    function canStartPreview(info) {
+      return Boolean(info) && (info.mode === "static" || Boolean(info.can_start));
+    }
+
+    function getRuntimeModeLabel(mode) {
+      if (mode === "static") return "静态页面";
+      if (mode === "node") return "Node 运行容器";
+      if (mode === "python_web") return "Python Web 运行容器";
+      if (mode === "python_desktop") return "Python 桌面项目";
+      return "不可预览";
+    }
+
+    function getRuntimeEmptyMessage(info) {
+      if (!info) return "当前 session 还没有可预览内容。";
+      if (info.last_error) return parseUiError(info.last_error).summary;
+      if (info.mode === "static") return "静态页面可直接预览。";
+      if (isHttpRuntimeMode(info.mode)) return "点击“启动/刷新”运行项目。";
+      if (info.mode === "python_desktop") {
+        return "检测到 Python 桌面/pygame 项目，当前浏览器预览不支持。请改为 HTML/Canvas、Node Web，或 Python HTTP 项目。";
+      }
+      return "当前 session 还没有可预览内容。";
+    }
+
     function clearPreview(message) {
-      currentRuntime = null;
       clearPreviewScaleTimers();
       previewFrameEl.hidden = true;
       previewFrameEl.style.display = "none";
@@ -1531,7 +1562,7 @@
 
     function applyRuntimeInfo(info, { reload = false } = {}) {
       currentRuntime = info;
-      const modeLabel = info.mode === "node" ? "Node 运行容器" : info.mode === "static" ? "静态页面" : "不可预览";
+      const modeLabel = getRuntimeModeLabel(info.mode);
       const statusLabel = {
         ready: "可直接预览",
         running: "运行中",
@@ -1541,12 +1572,16 @@
         not_configured: "未配置运行命令",
         not_available: "不可预览"
       }[info.status] || info.status;
-      const extra = info.entry_file
-        ? `入口：${info.entry_file}`
-        : (info.last_error ? parseUiError(info.last_error).summary : "当前还没有可预览内容。");
+      const preferErrorDetail = ["failed", "not_configured", "not_available"].includes(info.status);
+      const extra = preferErrorDetail && info.last_error
+        ? parseUiError(info.last_error).summary
+        : (info.entry_file
+          ? `入口：${info.entry_file}`
+          : (info.last_error ? parseUiError(info.last_error).summary : "当前还没有可预览内容。"));
       setPreviewMeta(`${modeLabel} · ${statusLabel} · ${extra}`);
 
-      previewStopBtn.disabled = !(info.mode === "node" && ["running", "starting", "failed", "stopped"].includes(info.status));
+      previewStartBtn.disabled = !canStartPreview(info);
+      previewStopBtn.disabled = !(isHttpRuntimeMode(info.mode) && ["running", "starting", "failed", "stopped"].includes(info.status));
 
       if (info.can_preview && info.preview_url) {
         const src = reload ? `${info.preview_url}${info.preview_url.includes("?") ? "&" : "?"}t=${Date.now()}` : info.preview_url;
@@ -1563,7 +1598,7 @@
         return;
       }
 
-      clearPreview(info.last_error ? parseUiError(info.last_error).summary : (info.mode === "node" ? "点击“启动/刷新”运行项目。" : "当前 session 还没有可预览内容。"));
+      clearPreview(getRuntimeEmptyMessage(info));
     }
 
     async function loadRuntime(sessionId, options = {}) {
@@ -1746,7 +1781,7 @@
         createSessionBtn.disabled = false;
         refreshSessionsBtn.disabled = false;
         deleteSessionBtn.disabled = !currentSessionId;
-        previewStartBtn.disabled = false;
+        previewStartBtn.disabled = !canStartPreview(currentRuntime);
       }
     }
 
@@ -1816,9 +1851,15 @@
           return;
         }
 
-        if (runtime.mode === "node" && runtime.status === "running") {
+        if (isHttpRuntimeMode(runtime.mode) && runtime.status === "running") {
           applyRuntimeInfo(runtime, { reload: true });
           setStatus("已刷新正在运行的预览。");
+          return;
+        }
+
+        if (!canStartPreview(runtime)) {
+          applyRuntimeInfo(runtime);
+          setStatus(getRuntimeEmptyMessage(runtime));
           return;
         }
 
