@@ -1,6 +1,7 @@
 import http.client
 import json
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -61,6 +62,7 @@ DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "demo-user")
 CONTAINER_UID = env_or_default("CLAUDE_CONTAINER_UID", str(os.getuid()))
 CONTAINER_GID = env_or_default("CLAUDE_CONTAINER_GID", str(os.getgid()))
 CONTAINER_HOME = env_or_default("CLAUDE_CONTAINER_HOME", "/home/agent")
+MAX_FILE_PREVIEW_BYTES = int(env_or_default("MAX_FILE_PREVIEW_BYTES", str(64 * 1024)))
 DEFAULT_RUNTIME_PROFILE = env_or_default("DEFAULT_RUNTIME_PROFILE", "aliyun")
 DEFAULT_CLAUDE_MODEL = env_or_default("DEFAULT_CLAUDE_MODEL", "sonnet")
 ALIYUN_ANTHROPIC_BASE_URL = env_or_default(
@@ -347,6 +349,309 @@ def maybe_annotate_output(prompt: str, output: str, workspace_diff: dict[str, li
         return f"{output}{suffix}"
 
     return output
+
+
+def truncate_text(value: str, limit: int = 240) -> str:
+    compact = " ".join((value or "").split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: max(limit - 3, 0)]}..."
+
+
+def strip_tool_error_markup(value: str) -> str:
+    text = value or ""
+    text = re.sub(r"</?tool_use_error>", "", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def flatten_text_value(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = [item for item in (flatten_text_value(item) for item in value) if item]
+        return "\n".join(parts) if parts else None
+    if isinstance(value, dict):
+        for key in ("text", "content", "result", "output", "value"):
+            if key in value:
+                text = flatten_text_value(value[key])
+                if text:
+                    return text
+        try:
+            return json.dumps(value, ensure_ascii=False)
+        except TypeError:
+            return str(value)
+    return str(value)
+
+
+def extract_message_content_blocks(payload: dict) -> list[dict]:
+    blocks: list[dict] = []
+
+    def extend_from_container(container) -> None:
+        if isinstance(container, dict):
+            content = container.get("content")
+            if isinstance(content, list):
+                blocks.extend(item for item in content if isinstance(item, dict))
+        elif isinstance(container, list):
+            for item in container:
+                extend_from_container(item)
+
+    for key in ("message", "messages", "content"):
+        extend_from_container(payload.get(key))
+
+    return blocks
+
+
+def extract_assistant_text(payload: dict) -> str | None:
+    texts = [
+        block["text"]
+        for block in extract_message_content_blocks(payload)
+        if block.get("type") == "text" and isinstance(block.get("text"), str)
+    ]
+    if texts:
+        return "".join(texts)
+
+    result = payload.get("result")
+    if isinstance(result, str):
+        return result
+    return None
+
+
+def summarize_tool_input(value) -> str | None:
+    if value is None:
+        return None
+
+    if isinstance(value, dict):
+        preferred_keys = ("command", "cmd", "file_path", "path", "prompt", "query")
+        parts: list[str] = []
+        for key in preferred_keys:
+            if key not in value:
+                continue
+            raw = value[key]
+            if raw is None or raw == "":
+                continue
+            text = raw if isinstance(raw, str) else flatten_text_value(raw)
+            if text:
+                parts.append(f"{key}: {truncate_text(text, 120)}")
+            if len(parts) >= 2:
+                return "; ".join(parts)
+
+        if parts:
+            return "; ".join(parts)
+
+        rendered = flatten_text_value(value)
+        return truncate_text(rendered, 220) if rendered else None
+
+    rendered = flatten_text_value(value)
+    return truncate_text(rendered, 220) if rendered else None
+
+
+def extract_stream_text_delta(payload: dict) -> str | None:
+    if payload.get("type") != "stream_event":
+        return None
+
+    event = payload.get("event")
+    if not isinstance(event, dict) or event.get("type") != "content_block_delta":
+        return None
+
+    delta = event.get("delta")
+    if not isinstance(delta, dict):
+        return None
+
+    if delta.get("type") == "text_delta" and isinstance(delta.get("text"), str):
+        return delta["text"]
+    return None
+
+
+def extract_failure_message(payload: dict) -> str | None:
+    tool_use_result = payload.get("tool_use_result")
+    if isinstance(tool_use_result, str) and tool_use_result.strip():
+        return strip_tool_error_markup(tool_use_result)
+
+    if payload.get("type") == "user":
+        for block in extract_message_content_blocks(payload):
+            if block.get("type") != "tool_result":
+                continue
+            content = strip_tool_error_markup(flatten_text_value(block.get("content")) or "")
+            if not content:
+                continue
+            if block.get("is_error") or "error" in content.lower():
+                return content
+
+    result_text = payload.get("result")
+    if isinstance(result_text, str):
+        cleaned = strip_tool_error_markup(result_text)
+        if cleaned and payload.get("subtype") in {"error", "failed"}:
+            return cleaned
+
+    return None
+
+
+def summarize_stream_event(payload: dict) -> list[dict]:
+    event = payload.get("event")
+    if not isinstance(event, dict):
+        return []
+
+    event_type = str(event.get("type") or "")
+    if event_type == "content_block_start":
+        block = event.get("content_block")
+        if not isinstance(block, dict):
+            return []
+        block_type = str(block.get("type") or "")
+        if block_type == "tool_use":
+            tool_name = block.get("name") or block.get("tool_name") or "tool"
+            return [
+                {
+                    "kind": "tool",
+                    "summary": f"Calling {tool_name}",
+                    "detail": summarize_tool_input(block.get("input")),
+                }
+            ]
+        if block_type in {"thinking", "redacted_thinking"}:
+            return [
+                {
+                    "kind": "thinking",
+                    "summary": "workshop is analyzing the task",
+                    "detail": None,
+                }
+            ]
+        return []
+
+    if event_type == "message_delta":
+        return []
+
+    # Ignore low-level content deltas such as input_json_delta.
+    return []
+
+
+def summarize_claude_event(payload: dict) -> list[dict]:
+    event_type = str(payload.get("type") or "message")
+    subtype = str(payload.get("subtype") or "").strip()
+    entries: list[dict] = []
+
+    if event_type == "stream_event":
+        return summarize_stream_event(payload)
+
+    if event_type == "system":
+        detail_parts = []
+        if payload.get("model"):
+            detail_parts.append(f"model: {payload['model']}")
+        if payload.get("cwd"):
+            detail_parts.append(f"cwd: {payload['cwd']}")
+        tools = payload.get("tools")
+        if isinstance(tools, list) and tools:
+            detail_parts.append(f"tools: {len(tools)}")
+        entries.append(
+            {
+                "kind": "system",
+                "summary": "workshop runtime initialized",
+                "detail": "; ".join(detail_parts) or (subtype or None),
+            }
+        )
+        return entries
+
+    if event_type == "assistant":
+        for block in extract_message_content_blocks(payload):
+            block_type = str(block.get("type") or "")
+            if block_type == "tool_use":
+                tool_name = block.get("name") or block.get("tool_name") or "tool"
+                entries.append(
+                    {
+                        "kind": "tool",
+                        "summary": f"Calling {tool_name}",
+                        "detail": summarize_tool_input(block.get("input")),
+                    }
+                )
+            elif block_type in {"thinking", "redacted_thinking"}:
+                entries.append(
+                    {
+                        "kind": "thinking",
+                        "summary": "workshop is analyzing the task",
+                        "detail": None,
+                    }
+                )
+        return entries
+
+    if event_type == "user":
+        for block in extract_message_content_blocks(payload):
+            block_type = str(block.get("type") or "")
+            if block_type == "tool_result":
+                detail = strip_tool_error_markup(flatten_text_value(block.get("content")) or "")
+                entries.append(
+                    {
+                        "kind": "error" if block.get("is_error") else "tool_result",
+                        "summary": "Tool returned error" if block.get("is_error") else "Tool returned output",
+                        "detail": truncate_text(detail, 220) or None,
+                    }
+                )
+        return entries
+
+    if event_type == "result":
+        detail_parts = []
+        if payload.get("duration_ms") is not None:
+            detail_parts.append(f"duration: {payload['duration_ms']} ms")
+        if payload.get("num_turns") is not None:
+            detail_parts.append(f"turns: {payload['num_turns']}")
+        entries.append(
+            {
+                "kind": "result",
+                "summary": f"workshop finished ({subtype or 'done'})",
+                "detail": "; ".join(detail_parts) or None,
+            }
+        )
+        return entries
+
+    entries.append(
+        {
+            "kind": "log",
+            "summary": f"workshop event: {event_type}",
+            "detail": subtype or None,
+        }
+    )
+    return entries
+
+
+def build_workspace_change_items(
+    session_id: str,
+    workspace_path: Path,
+    workspace_diff: dict[str, list[str]],
+) -> list[dict]:
+    items: list[dict] = []
+    for status, paths in (
+        ("added", workspace_diff["added"]),
+        ("modified", workspace_diff["modified"]),
+        ("deleted", workspace_diff["deleted"]),
+    ):
+        for relpath in paths:
+            item = {"path": relpath, "status": status}
+            if status != "deleted":
+                target = workspace_path / relpath
+                if target.exists() and target.is_file():
+                    item["size"] = target.stat().st_size
+                    item["preview_url"] = f"/sessions/{session_id}/workspace/files/{quote(relpath, safe='/')}"
+            items.append(item)
+    return items
+
+
+def read_workspace_file_preview(target: Path, workspace_path: Path) -> dict:
+    raw = target.read_bytes()
+    truncated = len(raw) > MAX_FILE_PREVIEW_BYTES
+    preview_bytes = raw[:MAX_FILE_PREVIEW_BYTES]
+    binary = b"\x00" in preview_bytes
+    content = None
+
+    if not binary:
+        content = preview_bytes.decode("utf-8", errors="replace")
+
+    return {
+        "path": str(target.relative_to(workspace_path)),
+        "size": len(raw),
+        "binary": binary,
+        "truncated": truncated,
+        "content": content,
+        "language": target.suffix.lstrip(".").lower() or "text",
+    }
 
 
 def run_command(
@@ -830,7 +1135,7 @@ def validate_runtime_env(profile: str) -> dict[str, str]:
         raise HTTPException(
             status_code=500,
             detail=(
-                f"Claude auth is not configured for runtime profile '{profile}'. "
+                f"workshop auth is not configured for runtime profile '{profile}'. "
                 "Set ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN or the corresponding ALIYUN_ANTHROPIC_* variables."
             ),
         )
@@ -871,6 +1176,9 @@ def build_claude_command(
     max_turns: int,
     append_system_prompt: str | None,
     runtime_profile: str,
+    output_format: str = "text",
+    verbose: bool = False,
+    include_partial_messages: bool = False,
 ) -> list[str]:
     claude_env = validate_runtime_env(runtime_profile)
 
@@ -903,7 +1211,7 @@ def build_claude_command(
         "-p",
         prompt,
         "--output-format",
-        "text",
+        output_format,
         "--model",
         model,
         "--max-turns",
@@ -915,6 +1223,11 @@ def build_claude_command(
     if append_system_prompt:
         final_system_prompt = f"{DEFAULT_APPEND_SYSTEM_PROMPT}\n\n{append_system_prompt}"
     command.extend(["--append-system-prompt", final_system_prompt])
+
+    if verbose:
+        command.append("--verbose")
+    if include_partial_messages:
+        command.append("--include-partial-messages")
 
     if has_assistant_reply(session["id"]):
         command.insert(command.index("-p"), "-c")
@@ -953,14 +1266,14 @@ def run_claude(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=f"Missing runtime dependency: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
-        raise HTTPException(status_code=504, detail="Claude execution timed out") from exc
+        raise HTTPException(status_code=504, detail="workshop execution timed out") from exc
 
     duration_ms = int((perf_counter() - started) * 1000)
     stdout = completed.stdout.strip()
     stderr = completed.stderr.strip()
 
     if completed.returncode != 0:
-        detail = stderr or stdout or f"Claude failed with exit code {completed.returncode}"
+        detail = stderr or stdout or f"workshop failed with exit code {completed.returncode}"
         raise HTTPException(status_code=500, detail=detail)
 
     workspace_diff = diff_workspace(before_snapshot, snapshot_workspace(workspace_path))
@@ -994,6 +1307,7 @@ def stream_claude(
 ):
     workspace_path = Path(session["workspace_path"]).resolve()
     before_snapshot = snapshot_workspace(workspace_path)
+    last_workspace_snapshot = before_snapshot
     command = build_claude_command(
         session=session,
         prompt=prompt,
@@ -1001,10 +1315,21 @@ def stream_claude(
         max_turns=max_turns,
         append_system_prompt=append_system_prompt,
         runtime_profile=runtime_profile,
+        output_format="stream-json",
+        verbose=True,
+        include_partial_messages=True,
     )
 
     started = perf_counter()
-    yield sse_event("started", {"session_id": session["id"], "timestamp": utc_now()})
+    yield sse_event(
+        "started",
+        {
+            "session_id": session["id"],
+            "timestamp": utc_now(),
+            "runtime_profile": runtime_profile,
+            "model": model,
+        },
+    )
 
     try:
         process = subprocess.Popen(
@@ -1020,39 +1345,137 @@ def stream_claude(
     assert process.stdout is not None
     os.set_blocking(process.stdout.fileno(), False)
 
-    output_chunks: list[str] = []
+    output_buffer = ""
+    raw_lines: list[str] = []
+    assistant_text = ""
+    last_failure_message: str | None = None
+    seen_progress: set[str] = set()
     deadline = perf_counter() + CLAUDE_TIMEOUT_SECONDS
+    next_workspace_scan = perf_counter() + 0.2
+
+    def process_stream_line(line: str):
+        nonlocal assistant_text, last_failure_message
+        raw_lines.append(line)
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            return [
+                sse_event(
+                    "progress",
+                    {
+                        "kind": "log",
+                        "summary": "Runtime output",
+                        "detail": truncate_text(line, 260) or None,
+                        "timestamp": utc_now(),
+                    },
+                )
+            ]
+
+        events: list[str] = []
+
+        failure_message = extract_failure_message(payload)
+        if failure_message:
+            last_failure_message = failure_message
+
+        delta_text = extract_stream_text_delta(payload)
+        if delta_text:
+            assistant_text += delta_text
+            events.append(sse_event("response_delta", {"text": delta_text}))
+
+        extracted_text = extract_assistant_text(payload)
+        if extracted_text and payload.get("type") != "stream_event":
+            if extracted_text.startswith(assistant_text):
+                delta = extracted_text[len(assistant_text):]
+            else:
+                delta = extracted_text
+            assistant_text = extracted_text
+            if delta:
+                events.append(sse_event("response_delta", {"text": delta}))
+
+        for entry in summarize_claude_event(payload):
+            fingerprint = json.dumps(entry, ensure_ascii=False, sort_keys=True)
+            if fingerprint in seen_progress:
+                continue
+            seen_progress.add(fingerprint)
+            events.append(
+                sse_event(
+                    "progress",
+                    {
+                        **entry,
+                        "timestamp": utc_now(),
+                    },
+                )
+            )
+        return events
 
     while True:
-        if perf_counter() > deadline:
+        now = perf_counter()
+        if now > deadline:
             process.kill()
             process.wait()
-            yield sse_event("error", {"message": "Claude execution timed out"})
+            yield sse_event("error", {"message": "workshop execution timed out"})
             return
+
+        if now >= next_workspace_scan:
+            current_snapshot = snapshot_workspace(workspace_path)
+            delta = diff_workspace(last_workspace_snapshot, current_snapshot)
+            if delta["changed_files"]:
+                yield sse_event(
+                    "workspace",
+                    {
+                        "changes": build_workspace_change_items(session["id"], workspace_path, delta),
+                        "changed_files": diff_workspace(before_snapshot, current_snapshot)["changed_files"],
+                        "timestamp": utc_now(),
+                    },
+                )
+                last_workspace_snapshot = current_snapshot
+            next_workspace_scan = now + 0.3
 
         chunk = read_available(process.stdout)
         if chunk:
-            text = chunk.decode("utf-8", errors="replace")
-            output_chunks.append(text)
-            yield sse_event("chunk", {"text": text})
+            output_buffer += chunk.decode("utf-8", errors="replace")
+            while "\n" in output_buffer:
+                line, output_buffer = output_buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
+                for event_text in process_stream_line(line):
+                    yield event_text
             continue
 
         if process.poll() is not None:
             tail = read_available(process.stdout)
             if tail:
-                text = tail.decode("utf-8", errors="replace")
-                output_chunks.append(text)
-                yield sse_event("chunk", {"text": text})
+                output_buffer += tail.decode("utf-8", errors="replace")
+            if output_buffer.strip():
+                for raw_line in output_buffer.splitlines():
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    for event_text in process_stream_line(line):
+                        yield event_text
+            current_snapshot = snapshot_workspace(workspace_path)
+            delta = diff_workspace(last_workspace_snapshot, current_snapshot)
+            if delta["changed_files"]:
+                yield sse_event(
+                    "workspace",
+                    {
+                        "changes": build_workspace_change_items(session["id"], workspace_path, delta),
+                        "changed_files": diff_workspace(before_snapshot, current_snapshot)["changed_files"],
+                        "timestamp": utc_now(),
+                    },
+                )
+                last_workspace_snapshot = current_snapshot
             break
 
         time.sleep(0.05)
 
     duration_ms = int((perf_counter() - started) * 1000)
-    output = "".join(output_chunks).strip()
     exit_code = process.returncode or 0
+    raw_output = "\n".join(raw_lines).strip()
 
     if exit_code != 0:
-        detail = output or f"Claude failed with exit code {exit_code}"
+        detail = last_failure_message or f"workshop failed with exit code {exit_code}"
         yield sse_event(
             "error",
             {
@@ -1063,7 +1486,8 @@ def stream_claude(
         )
         return
 
-    workspace_diff = diff_workspace(before_snapshot, snapshot_workspace(workspace_path))
+    workspace_diff = diff_workspace(before_snapshot, last_workspace_snapshot)
+    output = assistant_text.strip()
     annotated_output = maybe_annotate_output(prompt, output, workspace_diff)
 
     insert_message(
@@ -1084,6 +1508,7 @@ def stream_claude(
             "added_files": workspace_diff["added"],
             "modified_files": workspace_diff["modified"],
             "deleted_files": workspace_diff["deleted"],
+            "workspace_changes": build_workspace_change_items(session["id"], workspace_path, workspace_diff),
         },
     )
 
@@ -1196,6 +1621,16 @@ def list_messages(session_id: str) -> dict:
             (session_id,),
         ).fetchall()
     return {"items": [row_to_dict(row) for row in rows]}
+
+
+@app.get("/sessions/{session_id}/workspace/files/{file_path:path}")
+def get_workspace_file(session_id: str, file_path: str) -> dict:
+    session = fetch_session(session_id)
+    workspace_path = Path(session["workspace_path"]).resolve()
+    target = safe_workspace_file(workspace_path, file_path)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Workspace file not found")
+    return read_workspace_file_preview(target, workspace_path)
 
 
 @app.get("/sessions/{session_id}/runtime")
@@ -1340,13 +1775,13 @@ def list_runtime_profiles() -> dict:
         "items": [
             {
                 "id": "default",
-                "label": "Claude Default",
+                "label": "workshop Default",
                 "default_model": DEFAULT_CLAUDE_MODEL,
                 "configured": bool(resolve_claude_runtime_env("default").get("ANTHROPIC_API_KEY") or resolve_claude_runtime_env("default").get("ANTHROPIC_AUTH_TOKEN")),
             },
             {
                 "id": "aliyun",
-                "label": "Claude via Aliyun",
+                "label": "workshop via Aliyun",
                 "default_model": ALIYUN_ANTHROPIC_MODEL,
                 "configured": bool(ALIYUN_ANTHROPIC_API_KEY or ALIYUN_ANTHROPIC_AUTH_TOKEN),
                 "base_url": ALIYUN_ANTHROPIC_BASE_URL,

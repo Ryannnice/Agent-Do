@@ -387,6 +387,295 @@
       display: inline;
     }
 
+    .message.stream-card {
+      width: auto;
+      max-width: min(92%, 860px);
+      padding: 5px 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(125, 211, 252, 0.18);
+      background: linear-gradient(180deg, rgba(15, 23, 36, 0.96), rgba(11, 17, 27, 0.96));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .stream-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .stream-head strong {
+      font-size: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .stream-badge,
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #dffaf4;
+      background: rgba(45, 212, 191, 0.16);
+      border: 1px solid rgba(45, 212, 191, 0.22);
+    }
+
+    .stream-badge.done {
+      color: #dbeafe;
+      background: rgba(96, 165, 250, 0.16);
+      border-color: rgba(96, 165, 250, 0.22);
+    }
+
+    .stream-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .stream-meta span {
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      color: var(--muted);
+      background: rgba(118, 139, 168, 0.1);
+      border: 1px solid rgba(118, 139, 168, 0.14);
+    }
+
+    .stream-sections {
+      display: grid;
+      gap: 4px;
+    }
+
+    .stream-fold {
+      width: fit-content;
+      max-width: 100%;
+      border-radius: 9px;
+      border: 1px solid rgba(118, 139, 168, 0.16);
+      background: rgba(10, 15, 24, 0.78);
+      overflow: hidden;
+    }
+
+    .stream-fold summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 4px 6px;
+      cursor: pointer;
+      list-style: none;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .stream-fold summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .stream-fold-body {
+      padding: 0 6px 6px;
+    }
+
+    .stream-inline-meta {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: none;
+    }
+
+    .stream-response,
+    .file-preview {
+      margin: 0;
+      padding: 5px 6px;
+      border-radius: 8px;
+      background: rgba(4, 7, 13, 0.95);
+      border: 1px solid rgba(118, 139, 168, 0.14);
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow: auto;
+      max-height: 120px;
+    }
+
+    .stream-empty,
+    .file-meta,
+    .file-empty {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .progress-list,
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .progress-item {
+      width: fit-content;
+      max-width: 100%;
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(118, 139, 168, 0.14);
+      background: rgba(16, 22, 33, 0.92);
+    }
+
+    .progress-item strong {
+      display: block;
+      margin-bottom: 1px;
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+
+    .progress-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .progress-item.tool {
+      border-left: 3px solid rgba(45, 212, 191, 0.82);
+    }
+
+    .progress-item.tool_result {
+      border-left: 3px solid rgba(96, 165, 250, 0.82);
+    }
+
+    .progress-item.thinking {
+      border-left: 3px solid rgba(244, 114, 182, 0.82);
+    }
+
+    .progress-item.result {
+      border-left: 3px solid rgba(251, 191, 36, 0.82);
+    }
+
+    .progress-item.error {
+      border-left: 3px solid rgba(249, 115, 22, 0.9);
+      background: rgba(40, 18, 14, 0.88);
+    }
+
+    .stream-alert {
+      width: fit-content;
+      max-width: 100%;
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(249, 115, 22, 0.24);
+      background: rgba(51, 23, 16, 0.88);
+    }
+
+    .stream-alert strong {
+      display: block;
+      margin-bottom: 1px;
+      font-size: 11px;
+      letter-spacing: -0.01em;
+      color: #fff2e8;
+    }
+
+    .stream-alert span {
+      display: block;
+      color: #f7c8a9;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .raw-error {
+      margin-top: 4px;
+      font-size: 11px;
+    }
+
+    .raw-error summary {
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .raw-error pre {
+      margin: 4px 0 0;
+      padding: 5px 6px;
+      border-radius: 8px;
+      background: rgba(4, 7, 13, 0.95);
+      border: 1px solid rgba(118, 139, 168, 0.14);
+      color: #f5d7c0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 120px;
+      overflow: auto;
+    }
+
+    .file-card {
+      width: fit-content;
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid rgba(118, 139, 168, 0.16);
+      background: rgba(16, 22, 33, 0.92);
+      overflow: hidden;
+    }
+
+    .file-card summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      list-style: none;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    .file-card summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .file-summary {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .file-path {
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-size: 11px;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .file-badge.added {
+      color: #dffaf4;
+      background: rgba(45, 212, 191, 0.16);
+      border-color: rgba(45, 212, 191, 0.22);
+    }
+
+    .file-badge.modified {
+      color: #dbeafe;
+      background: rgba(96, 165, 250, 0.16);
+      border-color: rgba(96, 165, 250, 0.22);
+    }
+
+    .file-badge.deleted {
+      color: #fff3e6;
+      background: rgba(249, 115, 22, 0.16);
+      border-color: rgba(249, 115, 22, 0.22);
+    }
+
+    .file-body {
+      padding: 0 6px 6px;
+      display: grid;
+      gap: 4px;
+    }
+
     .preview-pane {
       background: var(--panel-soft);
     }
@@ -545,7 +834,7 @@
     <aside class="panel sidebar">
       <section class="brand">
         <h1>Agent-Do</h1>
-        <p>Claude Code 多会话工作台。左侧管理 session，右侧同时查看对话、预览和发送面板。</p>
+        <p>workshop 多会话工作台。左侧管理 session，右侧同时查看对话、预览和发送面板。</p>
       </section>
 
       <section class="sidebar-card">
@@ -655,14 +944,16 @@
     };
 
     let currentSessionId = null;
+    let currentMessages = [];
     let streaming = false;
     let currentRuntime = null;
     let previewScaleTimers = [];
+    const runInspectors = new Map();
     let runtimeProfiles = {
       default_runtime_profile: "aliyun",
       items: [
-        { id: "default", label: "Claude Default", default_model: "sonnet", configured: true },
-        { id: "aliyun", label: "Claude via Aliyun", default_model: "qwen3-coder-next", configured: true }
+        { id: "default", label: "workshop Default", default_model: "sonnet", configured: true },
+        { id: "aliyun", label: "workshop via Aliyun", default_model: "qwen3-coder-next", configured: true }
       ]
     };
 
@@ -769,9 +1060,313 @@
         .replaceAll(">", "&gt;");
     }
 
-    function renderMessages(items, transientAssistantText = "") {
+    function escapeAttr(value) {
+      return escapeHtml(value).replaceAll('"', "&quot;");
+    }
+
+    function encodePath(path) {
+      return String(path || "")
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+    }
+
+    function normalizeWorkshopText(value) {
+      return String(value ?? "")
+        .replaceAll("Claude", "workshop")
+        .replaceAll("claude", "workshop");
+    }
+
+    function compactText(value, maxLength = 180) {
+      const compact = normalizeWorkshopText(String(value ?? ""))
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!compact) return "";
+      if (compact.length <= maxLength) return compact;
+      return `${compact.slice(0, Math.max(maxLength - 1, 0))}…`;
+    }
+
+    function parseUiError(value) {
+      const raw = normalizeWorkshopText(String(value ?? "")).trim();
+      if (!raw) {
+        return { summary: "未知错误", raw: "" };
+      }
+
+      let candidate = raw;
+      if ((raw.startsWith("{") && raw.endsWith("}")) || (raw.startsWith("[") && raw.endsWith("]"))) {
+        try {
+          const parsed = JSON.parse(raw);
+          candidate = parsed?.detail || parsed?.message || parsed?.error || raw;
+        } catch {
+          candidate = raw;
+        }
+      }
+
+      const firstLine = String(candidate).split(/\r?\n/).find((line) => line.trim()) || String(candidate);
+      const summary = compactText(firstLine, 180) || "未知错误";
+      return {
+        summary,
+        raw: raw !== summary ? raw : ""
+      };
+    }
+
+    function summarizeStatusError(prefix, error) {
+      const detail = parseUiError(error?.message || error);
+      return `${prefix}${detail.summary}`;
+    }
+
+    function getRunInspector(sessionId = currentSessionId) {
+      return sessionId ? (runInspectors.get(sessionId) || null) : null;
+    }
+
+    function createRunInspector(sessionId) {
+      const inspector = {
+        sessionId,
+        streaming: true,
+        responseText: "",
+        progress: [],
+        error: null,
+        files: {},
+        fileOrder: [],
+        panels: {
+          response: true,
+          progress: false,
+          files: false
+        }
+      };
+      runInspectors.set(sessionId, inspector);
+      return inspector;
+    }
+
+    function setRunError(sessionId, message) {
+      const inspector = getRunInspector(sessionId);
+      if (!inspector) return;
+      inspector.error = parseUiError(message);
+      inspector.panels.progress = true;
+    }
+
+    function appendRunProgress(sessionId, entry) {
+      const inspector = getRunInspector(sessionId);
+      if (!inspector) return;
+      const kind = entry.kind || "log";
+      const rawDetail = entry.detail || "";
+      const parsedError = kind === "error" ? parseUiError(rawDetail) : null;
+      inspector.progress.push({
+        kind,
+        summary: normalizeWorkshopText(entry.summary || "workshop event"),
+        detail: kind === "error" ? parsedError.summary : compactText(rawDetail, 180),
+        rawDetail: kind === "error" ? parsedError.raw : ""
+      });
+      if (inspector.progress.length > 80) {
+        inspector.progress = inspector.progress.slice(-80);
+      }
+    }
+
+    function upsertRunFiles(sessionId, changes = []) {
+      const inspector = getRunInspector(sessionId);
+      if (!inspector) return;
+
+      for (const change of changes) {
+        if (!change?.path) continue;
+        const existing = inspector.files[change.path] || {};
+        const invalidated = change.status !== "deleted" && (existing.loaded || existing.needsReload);
+        inspector.files[change.path] = {
+          ...existing,
+          ...change,
+          expanded: existing.expanded || false,
+          loading: change.status === "deleted" ? false : Boolean(existing.loading),
+          loaded: change.status === "deleted" ? false : Boolean(existing.loaded && !invalidated),
+          needsReload: change.status === "deleted" ? false : Boolean(invalidated),
+          content: change.status === "deleted" ? "" : (existing.content || ""),
+          error: change.status === "deleted" ? "" : (existing.error || ""),
+          binary: change.status === "deleted" ? false : Boolean(existing.binary),
+          truncated: change.status === "deleted" ? false : Boolean(existing.truncated)
+        };
+        inspector.fileOrder = [change.path, ...inspector.fileOrder.filter((item) => item !== change.path)];
+      }
+    }
+
+    function renderFileCard(file) {
+      const metaParts = [];
+      if (Number.isFinite(file.size)) metaParts.push(`${file.size} B`);
+      if (file.truncated) metaParts.push("内容已截断");
+      if (file.language) metaParts.push(file.language);
+
+      let body = "";
+      if (file.status === "deleted") {
+        body = `
+          <div class="file-body">
+            <div class="file-empty">该文件已在本轮执行中被删除。</div>
+          </div>
+        `;
+      } else if (file.loading) {
+        body = `
+          <div class="file-body">
+            <div class="file-empty">正在加载文件内容...</div>
+          </div>
+        `;
+      } else if (file.error) {
+        body = `
+          <div class="file-body">
+            <div class="file-empty">${escapeHtml(file.error)}</div>
+          </div>
+        `;
+      } else if (file.loaded) {
+        body = `
+          <div class="file-body">
+            <div class="file-meta">${escapeHtml(metaParts.join(" · ") || "文本文件")}</div>
+            ${file.binary
+              ? `<div class="file-empty">这是二进制文件，当前仅显示元信息。</div>`
+              : `<pre class="file-preview">${escapeHtml(file.content || "")}</pre>`}
+          </div>
+        `;
+      } else if (file.expanded) {
+        body = `
+          <div class="file-body">
+            <div class="file-empty">${file.needsReload ? "文件已更新，正在重新加载内容..." : "展开后会自动加载文件内容。"}</div>
+          </div>
+        `;
+      }
+
+      return `
+        <details class="file-card" data-file-path="${escapeAttr(file.path)}" ${file.expanded ? "open" : ""}>
+          <summary>
+            <div class="file-summary">
+              <span class="file-badge ${escapeAttr(file.status || "modified")}">${escapeHtml(file.status || "modified")}</span>
+              <span class="file-path">${escapeHtml(file.path)}</span>
+            </div>
+            <span class="file-meta">${escapeHtml(metaParts.join(" · "))}</span>
+          </summary>
+          ${body}
+        </details>
+      `;
+    }
+
+    function bindInspectorToggles() {
+      const inspector = getRunInspector();
+      if (!inspector) return;
+
+      messagesEl.querySelectorAll(".stream-fold").forEach((el) => {
+        el.addEventListener("toggle", () => {
+          const panel = el.dataset.panel;
+          if (!panel) return;
+          inspector.panels[panel] = el.open;
+        });
+      });
+    }
+
+    function renderRunInspector(inspector) {
+      const latestStep = inspector.progress[inspector.progress.length - 1];
+      const responseMeta = inspector.responseText
+        ? `${inspector.responseText.length} chars`
+        : "暂无输出";
+      const progressMeta = inspector.progress.length
+        ? `${inspector.progress.length} 步${latestStep ? ` · ${escapeHtml(latestStep.summary)}` : ""}`
+        : "暂无过程";
+      const fileMeta = inspector.fileOrder.length
+        ? `${inspector.fileOrder.length} 个文件`
+        : "暂无文件变更";
+      const responseHtml = inspector.responseText
+        ? `<pre class="stream-response">${escapeHtml(inspector.responseText)}</pre>`
+        : `<div class="stream-empty">workshop 还没有输出可展示的文本。</div>`;
+
+      const progressHtml = inspector.progress.length
+        ? inspector.progress.slice(-12).map((entry) => `
+            <div class="progress-item ${escapeAttr(entry.kind || "log")}">
+              <strong>${escapeHtml(entry.summary || "workshop event")}</strong>
+              ${entry.detail ? `<span>${escapeHtml(entry.detail)}</span>` : ""}
+              ${entry.rawDetail ? `
+                <details class="raw-error">
+                  <summary>展开详情</summary>
+                  <pre>${escapeHtml(entry.rawDetail)}</pre>
+                </details>
+              ` : ""}
+            </div>
+          `).join("")
+        : `<div class="stream-empty">当前还没有过程事件。</div>`;
+
+      const filesHtml = inspector.fileOrder.length
+        ? inspector.fileOrder.map((path) => renderFileCard(inspector.files[path])).join("")
+        : `<div class="stream-empty">workshop 还没有生成或修改文件。</div>`;
+
+      const errorHtml = inspector.error ? `
+        <div class="stream-alert">
+          <strong>本轮执行失败</strong>
+          <span>${escapeHtml(inspector.error.summary)}</span>
+          ${inspector.error.raw ? `
+            <details class="raw-error">
+              <summary>展开完整错误</summary>
+              <pre>${escapeHtml(inspector.error.raw)}</pre>
+            </details>
+          ` : ""}
+        </div>
+      ` : "";
+
+      return `
+        <article class="message assistant stream-card">
+          <div class="stream-head">
+            <strong>${inspector.streaming ? "workshop 正在工作" : "最近一次运行记录"}</strong>
+            <span class="stream-badge ${inspector.streaming ? "" : "done"}">${inspector.streaming ? "Running" : "Done"}</span>
+          </div>
+          <div class="stream-meta">
+            <span>${responseMeta}</span>
+            <span>${inspector.progress.length} 步</span>
+            <span>${inspector.fileOrder.length} 文件</span>
+          </div>
+          <div class="stream-sections">
+            ${errorHtml}
+            <details class="stream-fold" data-panel="response" ${inspector.panels.response ? "open" : ""}>
+              <summary>
+                <span>${inspector.streaming ? "实时响应" : "最终响应"}</span>
+                <span class="stream-inline-meta">${responseMeta}</span>
+              </summary>
+              <div class="stream-fold-body">${responseHtml}</div>
+            </details>
+            <details class="stream-fold" data-panel="progress" ${inspector.panels.progress ? "open" : ""}>
+              <summary>
+                <span>工作过程</span>
+                <span class="stream-inline-meta">${progressMeta}</span>
+              </summary>
+              <div class="stream-fold-body">
+                <div class="progress-list">${progressHtml}</div>
+              </div>
+            </details>
+            <details class="stream-fold" data-panel="files" ${inspector.panels.files ? "open" : ""}>
+              <summary>
+                <span>已生成/变更文件</span>
+                <span class="stream-inline-meta">${fileMeta}</span>
+              </summary>
+              <div class="stream-fold-body">
+                <div class="file-list">${filesHtml}</div>
+              </div>
+            </details>
+          </div>
+        </article>
+      `;
+    }
+
+    function bindFilePreviewToggles() {
+      bindInspectorToggles();
+      const inspector = getRunInspector();
+      if (!inspector) return;
+
+      messagesEl.querySelectorAll(".file-card").forEach((el) => {
+        el.addEventListener("toggle", () => {
+          const file = inspector.files[el.dataset.filePath];
+          if (!file) return;
+          file.expanded = el.open;
+          if (el.open) {
+            loadFilePreview(currentSessionId, file.path).catch((error) => setStatus(summarizeStatusError("文件预览失败：", error)));
+          }
+        });
+      });
+    }
+
+    function renderMessages(items) {
+      const inspector = getRunInspector();
+      const shouldStick = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 72;
       const blocks = items.map((item) => {
-        const meta = item.role === "user" ? "User" : "Claude";
+        const meta = item.role === "user" ? "User" : "workshop";
         return `
           <article class="message ${item.role}">
             <span class="meta">${meta}</span>
@@ -780,22 +1375,29 @@
         `;
       });
 
-      if (transientAssistantText) {
-        blocks.push(`
-          <article class="message assistant">
-            <span class="meta">Claude</span>
-            <span class="message-text">${escapeHtml(transientAssistantText)}</span>
-          </article>
-        `);
+      if (inspector) {
+        blocks.push(renderRunInspector(inspector));
       }
 
       messagesEl.innerHTML = blocks.join("");
-      messageSummaryEl.textContent = `${items.length}${transientAssistantText ? "+" : ""} 条消息`;
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      bindFilePreviewToggles();
+      if (inspector) {
+        inspector.fileOrder.forEach((path) => {
+          const file = inspector.files[path];
+          if (file?.expanded && file.status !== "deleted" && !file.loading && (!file.loaded || file.needsReload)) {
+            loadFilePreview(currentSessionId, path).catch((error) => setStatus(summarizeStatusError("文件预览失败：", error)));
+          }
+        });
+      }
+      messageSummaryEl.textContent = `${items.length} 条消息${inspector ? ` · ${inspector.streaming ? "运行中" : "含运行记录"}` : ""}`;
+      if (shouldStick) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
     }
 
     function resetWorkspaceView() {
       setCurrentSessionState(null);
+      currentMessages = [];
       chatTitleEl.textContent = "未选择 Session";
       chatSubtitleEl.textContent = "先选择左侧一个 session，或者创建新的 session。";
       messageSummaryEl.textContent = "消息会显示在这里。";
@@ -868,10 +1470,50 @@
       return items;
     }
 
+    async function loadFilePreview(sessionId, path) {
+      const inspector = getRunInspector(sessionId);
+      const file = inspector?.files?.[path];
+      if (!file || file.status === "deleted" || file.loading || (file.loaded && !file.needsReload)) {
+        return;
+      }
+
+      file.loading = true;
+      file.error = "";
+      if (sessionId === currentSessionId) {
+        renderMessages(currentMessages);
+      }
+
+      try {
+        const data = await fetchJson(`/sessions/${sessionId}/workspace/files/${encodePath(path)}`);
+        const latest = getRunInspector(sessionId)?.files?.[path];
+        if (!latest) return;
+        latest.loading = false;
+        latest.loaded = true;
+        latest.needsReload = false;
+        latest.content = data.content || "";
+        latest.binary = Boolean(data.binary);
+        latest.truncated = Boolean(data.truncated);
+        latest.size = data.size;
+        latest.language = data.language || latest.language;
+        latest.error = "";
+      } catch (error) {
+        const latest = getRunInspector(sessionId)?.files?.[path];
+        if (!latest) return;
+        latest.loading = false;
+        latest.loaded = false;
+        latest.error = parseUiError(error?.message || error).summary;
+      }
+
+      if (sessionId === currentSessionId) {
+        renderMessages(currentMessages);
+      }
+    }
+
     async function loadMessages(sessionId) {
       const data = await fetchJson(`/sessions/${sessionId}/messages`);
-      renderMessages(data.items || []);
-      return data.items || [];
+      currentMessages = data.items || [];
+      renderMessages(currentMessages);
+      return currentMessages;
     }
 
     function clearPreview(message) {
@@ -899,7 +1541,9 @@
         not_configured: "未配置运行命令",
         not_available: "不可预览"
       }[info.status] || info.status;
-      const extra = info.entry_file ? `入口：${info.entry_file}` : (info.last_error || "当前还没有可预览内容。");
+      const extra = info.entry_file
+        ? `入口：${info.entry_file}`
+        : (info.last_error ? parseUiError(info.last_error).summary : "当前还没有可预览内容。");
       setPreviewMeta(`${modeLabel} · ${statusLabel} · ${extra}`);
 
       previewStopBtn.disabled = !(info.mode === "node" && ["running", "starting", "failed", "stopped"].includes(info.status));
@@ -919,7 +1563,7 @@
         return;
       }
 
-      clearPreview(info.last_error || (info.mode === "node" ? "点击“启动/刷新”运行项目。" : "当前 session 还没有可预览内容。"));
+      clearPreview(info.last_error ? parseUiError(info.last_error).summary : (info.mode === "node" ? "点击“启动/刷新”运行项目。" : "当前 session 还没有可预览内容。"));
     }
 
     async function loadRuntime(sessionId, options = {}) {
@@ -970,12 +1614,12 @@
       if (streaming) return;
 
       try {
+        const content = promptEl.value.trim();
+        if (!content) return;
+
         if (!currentSessionId) {
           await createSession();
         }
-
-        const content = promptEl.value.trim();
-        if (!content) return;
 
         streaming = true;
         sendBtn.disabled = true;
@@ -984,11 +1628,16 @@
         deleteSessionBtn.disabled = true;
         previewStartBtn.disabled = true;
 
-        const items = await loadMessages(currentSessionId);
-        items.push({ role: "user", content });
-        renderMessages(items);
+        currentMessages = [...currentMessages, { role: "user", content }];
+        createRunInspector(currentSessionId);
+        appendRunProgress(currentSessionId, {
+          kind: "system",
+          summary: "Request queued",
+          detail: `${runtimeProfileEl.value || runtimeProfiles.default_runtime_profile || "aliyun"} · ${modelEl.value || "sonnet"}`
+        });
+        renderMessages(currentMessages);
         promptEl.value = "";
-        setStatus("Claude 正在执行...");
+        setStatus("workshop 正在执行...");
 
         const response = await fetch(`/sessions/${currentSessionId}/messages/stream`, {
           method: "POST",
@@ -1009,7 +1658,6 @@
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let assistantText = "";
 
         while (true) {
           const { value, done } = await reader.read();
@@ -1025,20 +1673,58 @@
             const parsed = parseSseBlock(block);
             if (!parsed) continue;
 
-            if (parsed.event === "chunk") {
-              assistantText += parsed.data.text || "";
-              renderMessages(items, assistantText);
-              setStatus("Claude 正在输出...");
-            }
-
-            if (parsed.event === "done") {
+            if (parsed.event === "started") {
+              appendRunProgress(currentSessionId, {
+                kind: "system",
+                summary: "workshop task started",
+                detail: `${parsed.data.runtime_profile || runtimeProfileEl.value || "aliyun"} · ${parsed.data.model || modelEl.value || "sonnet"}`
+              });
+              renderMessages(currentMessages);
+              setStatus("workshop 已启动，等待输出...");
+            } else if (parsed.event === "progress") {
+              appendRunProgress(currentSessionId, {
+                kind: parsed.data.kind || "log",
+                summary: parsed.data.summary || "workshop event",
+                detail: parsed.data.detail || ""
+              });
+              renderMessages(currentMessages);
+              setStatus("workshop 正在工作...");
+            } else if (parsed.event === "response_delta" || parsed.event === "chunk") {
+              const inspector = getRunInspector();
+              if (inspector) {
+                inspector.responseText += parsed.data.text || "";
+              }
+              renderMessages(currentMessages);
+              setStatus("workshop 正在输出...");
+            } else if (parsed.event === "workspace") {
+              upsertRunFiles(currentSessionId, parsed.data.changes || []);
+              renderMessages(currentMessages);
+              const changedCount = (parsed.data.changed_files || []).length;
+              setStatus(`workshop 正在工作... 已检测到 ${changedCount} 个文件变化`);
+            } else if (parsed.event === "done") {
+              const inspector = getRunInspector();
+              if (inspector) {
+                inspector.streaming = false;
+                inspector.responseText = parsed.data.output || inspector.responseText;
+              }
+              upsertRunFiles(currentSessionId, parsed.data.workspace_changes || []);
+              renderMessages(currentMessages);
               const changed = parsed.data.changed_files || [];
               const detail = changed.length ? `变更文件：${changed.join(", ")}` : "未检测到 workspace 文件变更";
               setStatus(`执行完成，耗时 ${parsed.data.duration_ms} ms；${detail}`);
-            }
-
-            if (parsed.event === "error") {
-              setStatus(`执行失败：${parsed.data.message}`);
+            } else if (parsed.event === "error") {
+              const inspector = getRunInspector();
+              if (inspector) {
+                inspector.streaming = false;
+              }
+              setRunError(currentSessionId, parsed.data.message || "未知错误");
+              appendRunProgress(currentSessionId, {
+                kind: "error",
+                summary: "workshop execution failed",
+                detail: parsed.data.message || "未知错误"
+              });
+              renderMessages(currentMessages);
+              setStatus(`执行失败：${parseUiError(parsed.data.message || "未知错误").summary}`);
             }
           }
 
@@ -1049,9 +1735,13 @@
         await loadSessions();
         await loadRuntime(currentSessionId, { reload: true });
       } catch (error) {
-        setStatus(`请求失败：${error.message}`);
+        setStatus(summarizeStatusError("请求失败：", error));
       } finally {
         streaming = false;
+        const inspector = getRunInspector();
+        if (inspector) {
+          inspector.streaming = false;
+        }
         sendBtn.disabled = false;
         createSessionBtn.disabled = false;
         refreshSessionsBtn.disabled = false;
@@ -1061,7 +1751,7 @@
     }
 
     createSessionBtn.addEventListener("click", () => {
-      createSession().catch((error) => setStatus(`创建失败：${error.message}`));
+      createSession().catch((error) => setStatus(summarizeStatusError("创建失败：", error)));
     });
 
     refreshSessionsBtn.addEventListener("click", async () => {
@@ -1072,7 +1762,7 @@
         }
         setStatus("Session 列表已刷新。");
       } catch (error) {
-        setStatus(`刷新失败：${error.message}`);
+        setStatus(summarizeStatusError("刷新失败：", error));
       }
     });
 
@@ -1092,6 +1782,7 @@
         deleteSessionBtn.disabled = true;
         setStatus("正在删除当前 Session...");
         await fetchJson(`/sessions/${deletingId}`, { method: "DELETE" });
+        runInspectors.delete(deletingId);
         const items = await loadSessions();
         const nextSession = items.find((item) => item.id !== deletingId);
         if (nextSession) {
@@ -1102,7 +1793,7 @@
         setStatus("当前 Session 已删除。");
       } catch (error) {
         deleteSessionBtn.disabled = !currentSessionId;
-        setStatus(`删除失败：${error.message}`);
+        setStatus(summarizeStatusError("删除失败：", error));
       }
     });
 
@@ -1139,8 +1830,9 @@
         applyRuntimeInfo(started, { reload: true });
         setStatus(started.status === "running" ? "项目已启动，可在右侧预览。" : `当前状态：${started.status}`);
       } catch (error) {
-        clearPreview(`预览启动失败：${error.message}`);
-        setStatus(`预览启动失败：${error.message}`);
+        const message = summarizeStatusError("预览启动失败：", error);
+        clearPreview(message.replace(/^预览启动失败：/, ""));
+        setStatus(message);
       }
     });
 
@@ -1153,7 +1845,7 @@
         applyRuntimeInfo(stopped);
         setStatus("运行中的预览已停止。");
       } catch (error) {
-        setStatus(`停止预览失败：${error.message}`);
+        setStatus(summarizeStatusError("停止预览失败：", error));
       }
     });
 
@@ -1187,7 +1879,7 @@
         }
       })
       .catch((error) => {
-        setStatus(`初始化失败：${error.message}`);
+        setStatus(summarizeStatusError("初始化失败：", error));
       });
   </script>
 </body>
