@@ -1601,6 +1601,14 @@
       clearPreview(getRuntimeEmptyMessage(info));
     }
 
+    function applyReturnedPreview(preview, { reload = false } = {}) {
+      if (!preview || typeof preview !== "object") {
+        return false;
+      }
+      applyRuntimeInfo(preview, { reload });
+      return Boolean(preview.can_preview && preview.preview_url);
+    }
+
     async function loadRuntime(sessionId, options = {}) {
       const info = await fetchJson(`/sessions/${sessionId}/runtime`);
       applyRuntimeInfo(info, options);
@@ -1681,7 +1689,8 @@
             content,
             runtime_profile: runtimeProfileEl.value || runtimeProfiles.default_runtime_profile || "aliyun",
             model: modelEl.value || "sonnet",
-            max_turns: 8
+            max_turns: 8,
+            auto_start_preview: true
           })
         });
 
@@ -1746,7 +1755,14 @@
               renderMessages(currentMessages);
               const changed = parsed.data.changed_files || [];
               const detail = changed.length ? `变更文件：${changed.join(", ")}` : "未检测到 workspace 文件变更";
-              setStatus(`执行完成，耗时 ${parsed.data.duration_ms} ms；${detail}`);
+              const previewReady = applyReturnedPreview(parsed.data.preview, { reload: true });
+              if (previewReady) {
+                setStatus(`执行完成，耗时 ${parsed.data.duration_ms} ms；已自动打开预览，${detail}`);
+              } else if (parsed.data.preview?.last_error) {
+                setStatus(`执行完成，但预览未就绪：${parseUiError(parsed.data.preview.last_error).summary}`);
+              } else {
+                setStatus(`执行完成，耗时 ${parsed.data.duration_ms} ms；${detail}`);
+              }
             } else if (parsed.event === "error") {
               const inspector = getRunInspector();
               if (inspector) {

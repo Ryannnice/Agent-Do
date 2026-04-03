@@ -1386,7 +1386,7 @@ def build_runtime_payload(session: dict) -> dict:
     else:
         last_error = "当前 workspace 中没有可预览的静态页面，也没有可运行的 Web 项目。"
 
-    return {
+    payload = {
         "session_id": session["id"],
         "mode": mode,
         "status": status,
@@ -1401,6 +1401,34 @@ def build_runtime_payload(session: dict) -> dict:
         "internal_port": spec.get("internal_port") or (record.get("internal_port") if record else None),
         "last_error": last_error,
     }
+    payload["preview"] = {
+        "mode": payload["mode"],
+        "status": payload["status"],
+        "entry_file": payload.get("entry_file"),
+        "preview_url": payload.get("preview_url"),
+        "url": payload.get("preview_url"),
+        "can_preview": payload.get("can_preview"),
+        "can_start": payload.get("can_start"),
+        "last_error": payload.get("last_error"),
+    }
+    return payload
+
+
+def prepare_session_preview(session: dict, auto_start_preview: bool = True) -> dict:
+    runtime = build_runtime_payload(session)
+    if not auto_start_preview:
+        return runtime
+    if runtime["mode"] == "static":
+        return runtime
+    if not is_http_runtime_mode(runtime["mode"]) or not runtime.get("can_start"):
+        return runtime
+    if runtime["status"] in {"running", "starting"}:
+        return runtime
+
+    try:
+        return start_runtime_for_session(session)
+    except HTTPException:
+        return build_runtime_payload(session)
 
 
 def start_runtime_for_session(session: dict) -> dict:
@@ -1775,6 +1803,7 @@ def stream_claude(
     max_turns: int,
     append_system_prompt: str | None,
     runtime_profile: str,
+    auto_start_preview: bool = True,
 ):
     workspace_path = Path(session["workspace_path"]).resolve()
     before_snapshot = snapshot_workspace(workspace_path)
@@ -1969,6 +1998,7 @@ def stream_claude(
         duration_ms=duration_ms,
     )
 
+    preview = prepare_session_preview(session, auto_start_preview=auto_start_preview)
     yield sse_event(
         "done",
         {
@@ -1980,6 +2010,7 @@ def stream_claude(
             "modified_files": workspace_diff["modified"],
             "deleted_files": workspace_diff["deleted"],
             "workspace_changes": build_workspace_change_items(session["id"], workspace_path, workspace_diff),
+            "preview": preview["preview"],
         },
     )
 
@@ -2013,6 +2044,7 @@ class SendMessageRequest(BaseModel):
     max_turns: int = Field(default=8, ge=1, le=20)
     append_system_prompt: str | None = None
     runtime_profile: str | None = None
+    auto_start_preview: bool = Field(default=True)
 
 
 class RuntimeActionRequest(BaseModel):
@@ -2211,6 +2243,7 @@ def send_message(session_id: str, payload: SendMessageRequest) -> dict:
         exit_code=exit_code,
         duration_ms=duration_ms,
     )
+    preview = prepare_session_preview(session, auto_start_preview=payload.auto_start_preview)
 
     return {
         "session_id": session_id,
@@ -2223,6 +2256,7 @@ def send_message(session_id: str, payload: SendMessageRequest) -> dict:
         "added_files": workspace_diff["added"],
         "modified_files": workspace_diff["modified"],
         "deleted_files": workspace_diff["deleted"],
+        "preview": preview["preview"],
     }
 
 
@@ -2248,6 +2282,7 @@ def send_message_stream(session_id: str, payload: SendMessageRequest) -> Streami
             max_turns=payload.max_turns,
             append_system_prompt=payload.append_system_prompt,
             runtime_profile=runtime_profile,
+            auto_start_preview=payload.auto_start_preview,
         ),
         media_type="text/event-stream",
         headers=headers,
